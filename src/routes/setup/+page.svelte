@@ -7,6 +7,14 @@
 	let submitting = $state(false);
 	// URL carried from the successful test into the credentials step.
 	let testedUrl = $derived(form && 'url' in form && form.url ? String(form.url) : '');
+	// Once the connection test succeeds, stay on the credentials step — a
+	// failed sign-in attempt must not collapse the wizard back to step 1.
+	let credentialsStep = $derived(
+		Boolean(form && (('ok' in form && form.ok) || ('step' in form && form.step === 'connect')))
+	);
+	// Bound so a failed attempt's re-render can't wipe what the user typed.
+	let username = $state('');
+	let password = $state('');
 </script>
 
 <svelte:head>
@@ -27,7 +35,7 @@
 		{#if data.phase === 'connect'}
 			<form
 				method="POST"
-				action={form && 'ok' in form && form.ok ? '?/connect' : '?/test'}
+				action={credentialsStep ? '?/connect' : '?/test'}
 				use:enhance={() => {
 					submitting = true;
 					return async ({ update }) => {
@@ -49,10 +57,12 @@
 					/>
 				</label>
 
-				{#if form && 'ok' in form && form.ok}
-					<p class="rounded-lg bg-ok/15 px-3 py-2 text-sm text-ok">
-						Connected to {form.serverName} (v{form.version}). Now sign in:
-					</p>
+				{#if credentialsStep}
+					{#if form && 'ok' in form && form.ok}
+						<p class="rounded-lg bg-ok/15 px-3 py-2 text-sm text-ok">
+							Connected to {form.serverName} (v{form.version}). Now sign in:
+						</p>
+					{/if}
 					<label class="block">
 						<span class="mb-1 block text-sm text-ink-muted">Username</span>
 						<input
@@ -60,6 +70,7 @@
 							type="text"
 							required
 							autocomplete="username"
+							bind:value={username}
 							class="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-ink focus:border-accent"
 						/>
 					</label>
@@ -69,6 +80,7 @@
 							name="password"
 							type="password"
 							autocomplete="current-password"
+							bind:value={password}
 							class="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-ink focus:border-accent"
 						/>
 					</label>
@@ -87,7 +99,7 @@
 				>
 					{#if submitting}
 						Working…
-					{:else if form && 'ok' in form && form.ok}
+					{:else if credentialsStep}
 						Sign in and continue
 					{:else}
 						Test connection

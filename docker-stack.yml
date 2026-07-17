@@ -1,0 +1,52 @@
+# Docker Swarm stack for myoutarr with the music library on GlusterFS.
+#
+# Prerequisites:
+#   1. GlusterFS is mounted OUTSIDE Docker on each node that may run the task
+#      (e.g. /mnt/gluster/music via fstab with _netdev), and the stack
+#      bind-mounts that path. No volume plugin in the critical path.
+#   2. Pin the service to the node holding /config (SQLite must be on
+#      node-local storage — never on Gluster):
+#        docker node update --label-add myoutarr=true <node>
+#   3. Secrets: nothing requires one today (sessions are opaque random ids in
+#      the local database, and Jellyfin tokens come from user logins). Any env
+#      var can still be provided as a Docker secret: mount it and set
+#      <NAME>_FILE=/run/secrets/<name> — the app reads secret files first.
+#
+# PUID/PGID must resolve to the same numeric ids on every Gluster node and in
+# Jellyfin's container, or Jellyfin cannot read what myoutarr writes.
+
+services:
+  myoutarr:
+    image: ghcr.io/OWNER/myoutarr:latest
+    ports:
+      - '8687:8687'
+    environment:
+      PUID: '1000'
+      PGID: '1000'
+      TZ: Europe/Paris
+      YTDLP_AUTO_UPDATE: 'false'
+    volumes:
+      # node-local: SQLite (WAL) + download scratch — must not be on Gluster
+      - /opt/myoutarr/config:/config
+      # the shared library on the GlusterFS FUSE mountpoint
+      - /mnt/gluster/music:/music
+    stop_grace_period: 60s # let in-flight downloads abort and requeue cleanly
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8687/api/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      # NON-NEGOTIABLE: one replica. Two workers would race the SQLite job
+      # queue and double-download. stop-first prevents an overlap during
+      # rolling updates for the same reason.
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.myoutarr == true
+      update_config:
+        order: stop-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s

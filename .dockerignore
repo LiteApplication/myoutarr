@@ -1,0 +1,12 @@
+node_modules
+build
+.svelte-kit
+.git
+.venv
+coverage
+test-results
+playwright-report
+e2e/.tmp
+*.md
+.github
+.vscode

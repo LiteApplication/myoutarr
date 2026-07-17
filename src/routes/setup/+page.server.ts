@@ -48,14 +48,14 @@ export const actions: Actions = {
 		const password = String(form.get('password') ?? '');
 
 		if (!url || !username) {
-			return fail(400, { step: 'connect', error: 'Server URL and username are required.' });
+			return fail(400, { step: 'connect', url, error: 'Server URL and username are required.' });
 		}
 
 		let client: JellyfinClient;
 		try {
 			client = new JellyfinClient(url);
 		} catch {
-			return fail(400, { step: 'connect', error: 'That server URL is not valid.' });
+			return fail(400, { step: 'connect', url, error: 'That server URL is not valid.' });
 		}
 
 		try {
@@ -63,6 +63,7 @@ export const actions: Actions = {
 			if (requireAdmin() && !auth.isAdmin) {
 				return fail(403, {
 					step: 'connect',
+					url,
 					error: 'Setup requires a Jellyfin administrator account.'
 				});
 			}
@@ -77,10 +78,11 @@ export const actions: Actions = {
 			});
 		} catch (error) {
 			if (error instanceof JellyfinError && error.status === 401) {
-				return fail(401, { step: 'connect', error: 'Wrong username or password.' });
+				return fail(401, { step: 'connect', url, error: 'Wrong username or password.' });
 			}
 			return fail(502, {
 				step: 'connect',
+				url,
 				error: error instanceof JellyfinError ? error.message : 'Setup failed unexpectedly.'
 			});
 		}
