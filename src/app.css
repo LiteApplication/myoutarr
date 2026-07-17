@@ -1,31 +1,36 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/fraunces';
 @import 'tailwindcss';
 
 /*
- * Dark, music-app palette: near-black canvas with layered elevated surfaces
- * and a single saturated accent. Tokens are defined once here so components
- * never hardcode hex values.
+ * "Nocturne & Brass" — deep indigo-black canvas, warm paper ink, a brass
+ * accent with a violet counterpoint. Record-sleeve lounge, not video platform.
+ * Components only ever use these semantic tokens; retheming is a token swap.
  */
 @theme {
-	--color-canvas: #030303;
-	--color-surface: #0f0f0f;
-	--color-surface-2: #212121;
-	--color-surface-3: #383838;
-	--color-line: #303030;
+	--color-canvas: #0b0b12;
+	--color-surface: #131320;
+	--color-surface-2: #1c1c2c;
+	--color-surface-3: #2a2a40;
+	--color-line: #26263a;
 
-	--color-ink: #ffffff;
-	--color-ink-muted: #aaaaaa;
-	--color-ink-faint: #717171;
+	--color-ink: #f2efe7;
+	--color-ink-muted: #a8a49a;
+	--color-ink-faint: #6d6a63;
 
-	--color-accent: #ff0033;
-	--color-accent-hover: #ff2d55;
-	--color-accent-ink: #ffffff;
+	--color-accent: #e0a458;
+	--color-accent-hover: #f0b96e;
+	--color-accent-ink: #1a1206;
 
-	--color-ok: #2ba640;
-	--color-warn: #f1c40f;
-	--color-danger: #cc0000;
+	--color-counter: #8b7cf8;
+	--color-counter-soft: #372f6e;
 
-	--font-sans:
-		'Roboto', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+	--color-ok: #5fbf77;
+	--color-warn: #e6c76a;
+	--color-danger: #e06058;
+
+	--font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+	--font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
 
 	/* Height of the persistent queue bar; layouts reserve space for it. */
 	--spacing-queuebar: 4.5rem;
@@ -45,10 +50,20 @@
 		-webkit-font-smoothing: antialiased;
 	}
 
+	h1 {
+		font-family: var(--font-display);
+		font-variation-settings: 'SOFT' 60;
+		letter-spacing: -0.015em;
+	}
+
 	/* Keyboard focus must stay visible against the dark canvas. */
 	:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
+	}
+
+	::selection {
+		background: var(--color-counter-soft);
 	}
 
 	::-webkit-scrollbar {
@@ -71,11 +86,30 @@
 }
 
 @layer utilities {
+	.font-display {
+		font-family: var(--font-display);
+	}
+
 	/* Clamp titles in cards to keep grid rows aligned. */
 	.line-clamp-2-fixed {
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
+	}
+
+	/* Ambient wash behind hero headers (artist/album pages). */
+	.hero-wash {
+		background:
+			radial-gradient(
+				60rem 24rem at 12% -20%,
+				color-mix(in oklab, var(--color-counter) 16%, transparent),
+				transparent 60%
+			),
+			radial-gradient(
+				50rem 20rem at 90% -30%,
+				color-mix(in oklab, var(--color-accent) 12%, transparent),
+				transparent 55%
+			);
 	}
 }

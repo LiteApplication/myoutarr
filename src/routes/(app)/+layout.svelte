@@ -30,13 +30,13 @@
 	<nav
 		class="fixed inset-y-0 left-0 z-20 hidden w-rail flex-col border-r border-line bg-canvas md:flex"
 	>
-		<a href="/" class="flex h-topbar items-center gap-2 px-5">
+		<a href="/" class="flex h-topbar items-center gap-2.5 px-5">
 			<span
-				class="grid h-8 w-8 place-items-center rounded-full bg-accent font-black text-accent-ink"
+				class="font-display grid h-8 w-8 place-items-center rounded-lg bg-accent text-xl font-black italic text-accent-ink"
 			>
 				m
 			</span>
-			<span class="text-lg font-bold tracking-tight">myoutarr</span>
+			<span class="font-display text-xl font-semibold tracking-tight">myoutarr</span>
 		</a>
 		<div class="mt-2 flex flex-col gap-1 px-3">
 			{#each navItems as item (item.href)}
@@ -105,7 +105,7 @@
 		</header>
 
 		<!-- Routed content; bottom padding reserves room for the queue bar -->
-		<main class="min-w-0 flex-1 px-4 pb-queuebar pt-6 md:px-8">
+		<main class="hero-wash min-w-0 flex-1 px-4 pb-queuebar pt-6 md:px-8">
 			{@render children()}
 		</main>
 	</div>
