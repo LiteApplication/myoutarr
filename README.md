@@ -21,7 +21,7 @@ Search YouTube Music, queue downloads, and get a **correctly tagged, Jellyfin-re
 ```yaml
 services:
   myoutarr:
-    image: ghcr.io/OWNER/myoutarr:latest
+    image: ghcr.io/liteapplication/myoutarr:latest
     ports: ['8687:8687']
     environment:
       PUID: '1000'

@@ -1,7 +1,7 @@
 # Plain docker-compose for non-Swarm users. See docker-stack.yml for Swarm.
 services:
   myoutarr:
-    image: ghcr.io/OWNER/myoutarr:latest
+    image: ghcr.io/liteapplication/myoutarr:latest
     build: .
     container_name: myoutarr
     ports:

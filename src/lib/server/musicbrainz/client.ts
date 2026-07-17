@@ -3,7 +3,7 @@ import { getDb } from '../db/index.ts';
 import type { JobMeta } from '../queue/store.ts';
 
 const MB_BASE = 'https://musicbrainz.org/ws/2';
-const USER_AGENT = 'myoutarr/0.1.0 ( https://github.com/alexisrossfelder/myoutarr )';
+const USER_AGENT = 'myoutarr/0.1.0 ( https://github.com/LiteApplication/myoutarr )';
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const MIN_SCORE = 85;
 
