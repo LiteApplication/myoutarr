@@ -1,5 +1,5 @@
 # ---------- build stage ----------
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
@@ -11,7 +11,7 @@ RUN apk add --no-cache python3 make g++ \
 	&& npm rebuild better-sqlite3
 
 # ---------- runtime stage ----------
-FROM node:22-alpine
+FROM node:26-alpine
 
 # ffmpeg for extraction/embedding; dumb-init for signal forwarding and zombie
 # reaping (we spawn yt-dlp/ffmpeg/python children); su-exec for PUID/PGID drop.
