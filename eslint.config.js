@@ -20,6 +20,8 @@ export default ts.config(
 				setInterval: 'readonly',
 				clearInterval: 'readonly',
 				AbortController: 'readonly',
+				AbortSignal: 'readonly',
+				URLSearchParams: 'readonly',
 				TextEncoder: 'readonly',
 				TextDecoder: 'readonly',
 				ReadableStream: 'readonly',
@@ -38,6 +40,9 @@ export default ts.config(
 	},
 	{
 		rules: {
+			// The app is always served from the domain root (its container has no
+			// configurable base path), so resolve()-wrapping every href is noise.
+			'svelte/no-navigation-without-resolve': 'off',
 			// The yt-dlp/worker boundary passes loosely-typed JSON around; prefer
 			// explicit `unknown` + narrowing, but don't block on library types.
 			'@typescript-eslint/no-explicit-any': 'warn',
