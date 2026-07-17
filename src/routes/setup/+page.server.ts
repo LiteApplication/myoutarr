@@ -1,6 +1,7 @@
 import { createSession, SESSION_COOKIE } from '$lib/server/auth/session';
 import { requireAdmin } from '$lib/server/env';
 import { JellyfinClient, JellyfinError } from '$lib/server/jellyfin/client';
+import { createSentinel } from '$lib/server/library/publish';
 import { getSettings, updateSettings } from '$lib/server/settings';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
@@ -97,6 +98,16 @@ export const actions: Actions = {
 			return fail(400, { step: 'library', error: 'Choose or enter a library path.' });
 		}
 		updateSettings({ jellyfinLibraryPath: libraryPath });
+		// The sentinel marks the real (mounted) music volume; its absence later
+		// means the mount dropped and downloads must refuse to write.
+		try {
+			createSentinel();
+		} catch (cause) {
+			return fail(500, {
+				step: 'library',
+				error: `Music volume is not writable: ${(cause as Error).message}`
+			});
+		}
 		redirect(303, '/');
 	}
 };

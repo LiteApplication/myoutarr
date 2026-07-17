@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import QueueBar from '$lib/components/QueueBar.svelte';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
@@ -110,3 +111,5 @@
 		</main>
 	</div>
 </div>
+
+<QueueBar />
