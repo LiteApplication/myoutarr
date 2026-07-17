@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+
+/*
+ * Dark, music-app palette: near-black canvas with layered elevated surfaces
+ * and a single saturated accent. Tokens are defined once here so components
+ * never hardcode hex values.
+ */
+@theme {
+	--color-canvas: #030303;
+	--color-surface: #0f0f0f;
+	--color-surface-2: #212121;
+	--color-surface-3: #383838;
+	--color-line: #303030;
+
+	--color-ink: #ffffff;
+	--color-ink-muted: #aaaaaa;
+	--color-ink-faint: #717171;
+
+	--color-accent: #ff0033;
+	--color-accent-hover: #ff2d55;
+	--color-accent-ink: #ffffff;
+
+	--color-ok: #2ba640;
+	--color-warn: #f1c40f;
+	--color-danger: #cc0000;
+
+	--font-sans:
+		'Roboto', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+
+	/* Height of the persistent queue bar; layouts reserve space for it. */
+	--spacing-queuebar: 4.5rem;
+	--spacing-rail: 15rem;
+	--spacing-topbar: 4rem;
+}
+
+@layer base {
+	html {
+		background-color: var(--color-canvas);
+		color: var(--color-ink);
+		color-scheme: dark;
+	}
+
+	body {
+		font-family: var(--font-sans);
+		-webkit-font-smoothing: antialiased;
+	}
+
+	/* Keyboard focus must stay visible against the dark canvas. */
+	:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	::-webkit-scrollbar {
+		width: 8px;
+		height: 8px;
+	}
+
+	::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	::-webkit-scrollbar-thumb {
+		background: var(--color-surface-3);
+		border-radius: 4px;
+	}
+
+	::-webkit-scrollbar-thumb:hover {
+		background: var(--color-ink-faint);
+	}
+}
+
+@layer utilities {
+	/* Clamp titles in cards to keep grid rows aligned. */
+	.line-clamp-2-fixed {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+}
