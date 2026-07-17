@@ -149,4 +149,54 @@ export class JellyfinClient {
 	async refreshLibrary(token: string): Promise<void> {
 		await this.request<void>('POST', '/Library/Refresh', { token });
 	}
+
+	/** Find an audio item by title, then match on its filesystem path. */
+	async findAudioByPath(token: string, title: string, path: string): Promise<string | null> {
+		const result = await this.request<{
+			Items?: { Id: string; Path?: string }[];
+		}>(
+			'GET',
+			`/Items?recursive=true&includeItemTypes=Audio&fields=Path&limit=20&searchTerm=${encodeURIComponent(title)}`,
+			{ token }
+		);
+		return result.Items?.find((item) => item.Path === path)?.Id ?? null;
+	}
+
+	/** Locate an existing audio playlist by exact name, if any. */
+	async findPlaylist(token: string, name: string): Promise<string | null> {
+		const result = await this.request<{ Items?: { Id: string; Name?: string }[] }>(
+			'GET',
+			`/Items?recursive=true&includeItemTypes=Playlist&searchTerm=${encodeURIComponent(name)}`,
+			{ token }
+		);
+		return result.Items?.find((item) => item.Name === name)?.Id ?? null;
+	}
+
+	async createPlaylist(
+		token: string,
+		userId: string,
+		name: string,
+		itemIds: string[]
+	): Promise<string> {
+		const result = await this.request<{ Id?: string }>('POST', '/Playlists', {
+			token,
+			body: { Name: name, UserId: userId, Ids: itemIds, MediaType: 'Audio' }
+		});
+		if (!result.Id) throw new JellyfinError('playlist creation returned no id');
+		return result.Id;
+	}
+
+	async addToPlaylist(
+		token: string,
+		playlistId: string,
+		userId: string,
+		itemIds: string[]
+	): Promise<void> {
+		if (itemIds.length === 0) return;
+		await this.request<void>(
+			'POST',
+			`/Playlists/${playlistId}/Items?ids=${itemIds.join(',')}&userId=${encodeURIComponent(userId)}`,
+			{ token }
+		);
+	}
 }
