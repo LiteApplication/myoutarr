@@ -1,14 +1,17 @@
 # ---------- build stage ----------
 FROM node:26-alpine AS build
 WORKDIR /app
+
+# better-sqlite3 needs its native build (blocked by --ignore-scripts below)
+RUN apk add --no-cache python3 make g++
+
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN --mount=type=cache,target=/root/.npm \
+	npm ci --ignore-scripts \
+	&& npm rebuild better-sqlite3
+
 COPY . .
 RUN npx svelte-kit sync && npm run build && npm prune --omit=dev
-
-# better-sqlite3 needs its native build (blocked by --ignore-scripts above)
-RUN apk add --no-cache python3 make g++ \
-	&& npm rebuild better-sqlite3
 
 # ---------- runtime stage ----------
 FROM node:26-alpine
