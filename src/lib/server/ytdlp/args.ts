@@ -20,6 +20,11 @@ export function buildYtdlpArgs(options: {
 	}
 	const args = [
 		'--no-playlist',
+		// Prefer an audio-only stream, but fall back to the best combined format
+		// so videos that expose no standalone audio format still download instead
+		// of failing with "Requested format is not available".
+		'--format',
+		'bestaudio/best',
 		'--extract-audio',
 		'--audio-format',
 		settings.audioFormat,
@@ -33,7 +38,6 @@ export function buildYtdlpArgs(options: {
 		'--progress-template',
 		// One JSON object per line; parsed by progress.ts.
 		'%(progress)j',
-		'--no-warnings',
 		'--retries',
 		'3',
 		'--socket-timeout',

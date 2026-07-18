@@ -111,6 +111,9 @@ export class YtdlpPipeline implements JobRunner {
 				if (update) onProgress(update.fraction * DOWNLOAD_SHARE);
 			});
 			createInterface({ input: child.stderr }).on('line', (line) => {
+				// Mirror yt-dlp diagnostics to the server log so failures are visible
+				// live, not just in the final error message.
+				console.error(`[yt-dlp ${job.videoId}] ${line}`);
 				stderrTail.push(line);
 				if (stderrTail.length > 15) stderrTail.shift();
 			});
