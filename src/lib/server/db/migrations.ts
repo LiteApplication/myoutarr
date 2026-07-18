@@ -57,5 +57,26 @@ export const migrations: string[] = [
 		value      TEXT NOT NULL,                -- JSON response
 		fetched_at INTEGER NOT NULL
 	) STRICT;
+	`,
+	// 2 - artist subscriptions: auto-download new releases
+	`
+	CREATE TABLE artist_subscriptions (
+		browse_id       TEXT PRIMARY KEY,         -- YT Music artist channel id (UC…)
+		name            TEXT NOT NULL,
+		thumbnail       TEXT,
+		created_by      TEXT NOT NULL,            -- Jellyfin user id the downloads are attributed to
+		created_at      INTEGER NOT NULL,         -- unix ms
+		last_checked_at INTEGER                   -- unix ms; NULL until first check
+	) STRICT;
+
+	-- Releases already accounted for, so a daily check only enqueues genuinely
+	-- new ones. Seeded with the artist's current discography on subscribe.
+	CREATE TABLE subscription_seen (
+		browse_id  TEXT NOT NULL
+			REFERENCES artist_subscriptions (browse_id) ON DELETE CASCADE,
+		release_id TEXT NOT NULL,                 -- album browseId (MPRE…)
+		seen_at    INTEGER NOT NULL,              -- unix ms
+		PRIMARY KEY (browse_id, release_id)
+	) STRICT;
 	`
 ];

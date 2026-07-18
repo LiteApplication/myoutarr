@@ -1,3 +1,4 @@
+import { ensureServices } from '$lib/server/app';
 import { getSession, SESSION_COOKIE } from '$lib/server/auth/session';
 import { getSettings } from '$lib/server/settings';
 import { redirect, type Handle } from '@sveltejs/kit';
@@ -22,6 +23,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 		redirect(303, configured ? '/login' : '/setup');
 	}
+
+	// An authenticated request means the instance is configured and in use:
+	// boot the worker pool + subscription scheduler if they aren't already.
+	if (event.locals.session) ensureServices();
 
 	return resolve(event);
 };

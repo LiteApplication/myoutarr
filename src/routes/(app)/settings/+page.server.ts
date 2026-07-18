@@ -30,6 +30,11 @@ export const actions: Actions = {
 		patch.sponsorBlock = form.get('sponsorBlock') === 'on';
 		patch.musicBrainz = form.get('musicBrainz') === 'on';
 		patch.jellyfinRefresh = form.get('jellyfinRefresh') === 'on';
+		patch.subscriptionsEnabled = form.get('subscriptionsEnabled') === 'on';
+		const checkHours = Number(form.get('subscriptionCheckHours'));
+		if (Number.isInteger(checkHours) && checkHours >= 1 && checkHours <= 168) {
+			patch.subscriptionCheckHours = checkHours;
+		}
 		const rateLimit = String(form.get('rateLimit') ?? '').trim();
 		if (rateLimit === '' || /^\d+(\.\d+)?[KMG]?$/i.test(rateLimit)) patch.rateLimit = rateLimit;
 		else return fail(400, { error: 'Rate limit must look like 500K or 4M.' });

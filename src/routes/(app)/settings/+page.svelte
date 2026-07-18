@@ -161,6 +161,34 @@
 			</label>
 		</section>
 
+		<section class="rounded-2xl bg-surface p-6">
+			<h2 class="mb-4 text-lg font-semibold">Subscriptions</h2>
+			<label class="flex items-center gap-3">
+				<input
+					type="checkbox"
+					name="subscriptionsEnabled"
+					checked={settings.subscriptionsEnabled}
+					class="accent-accent"
+				/>
+				<span class="text-sm text-ink"> Auto-download new releases from artists you follow </span>
+			</label>
+			<label class="mt-4 block max-w-xs">
+				<span class="mb-1 block text-sm text-ink-muted">Check interval (hours, 1–168)</span>
+				<input
+					name="subscriptionCheckHours"
+					type="number"
+					min="1"
+					max="168"
+					value={settings.subscriptionCheckHours}
+					class="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-ink focus:border-accent"
+				/>
+				<span class="mt-1 block text-xs text-ink-faint">
+					How often a followed artist is polled for new releases. Manage the list on the
+					<a href="/subscriptions" class="text-ink hover:underline">Subscriptions</a> page.
+				</span>
+			</label>
+		</section>
+
 		{#if form?.error}
 			<p class="rounded-lg bg-danger/15 px-3 py-2 text-sm text-danger" role="alert">{form.error}</p>
 		{/if}

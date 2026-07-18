@@ -244,6 +244,52 @@ export async function getArtistAlbums(
 		.filter((a): a is AlbumResult => a !== null);
 }
 
+export interface ArtistReleases {
+	browseId: string;
+	name: string;
+	thumbnail: string | null;
+	/** Albums + singles/EPs, de-duplicated by browseId. */
+	releases: AlbumResult[];
+}
+
+/**
+ * The full discography of an artist as a flat, de-duplicated release list -
+ * the shape subscriptions diff against to find genuinely new releases.
+ * Paginated sections ("see all albums/singles") are expanded when present,
+ * falling back to the inline preview if the follow-up request fails.
+ */
+export async function getArtistReleases(
+	browseId: string,
+	worker: YtMusicWorker = getYtMusic()
+): Promise<ArtistReleases> {
+	const artist = await getArtist(browseId, worker);
+	const albums = artist.albumsParams
+		? await getArtistAlbums(artist.albumsParams.browseId, artist.albumsParams.params, worker).catch(
+				() => artist.albums
+			)
+		: artist.albums;
+	const singles = artist.singlesParams
+		? await getArtistAlbums(
+				artist.singlesParams.browseId,
+				artist.singlesParams.params,
+				worker
+			).catch(() => artist.singles)
+		: artist.singles;
+	const seen = new Set<string>();
+	const releases: AlbumResult[] = [];
+	for (const release of [...albums, ...singles]) {
+		if (seen.has(release.browseId)) continue;
+		seen.add(release.browseId);
+		releases.push(release);
+	}
+	return {
+		browseId,
+		name: artist.name,
+		thumbnail: artist.thumbnails.at(-1)?.url ?? null,
+		releases
+	};
+}
+
 export async function getAlbum(
 	browseId: string,
 	worker: YtMusicWorker = getYtMusic()
