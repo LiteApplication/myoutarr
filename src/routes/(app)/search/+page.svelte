@@ -22,7 +22,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.query ? `${data.query} — search` : 'Search'} — myoutarr</title>
+	<title>{data.query ? `${data.query} - search` : 'Search'} - myoutarr</title>
 </svelte:head>
 
 {#if data.query}

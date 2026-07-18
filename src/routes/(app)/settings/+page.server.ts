@@ -34,6 +34,15 @@ export const actions: Actions = {
 		if (rateLimit === '' || /^\d+(\.\d+)?[KMG]?$/i.test(rateLimit)) patch.rateLimit = rateLimit;
 		else return fail(400, { error: 'Rate limit must look like 500K or 4M.' });
 
+		const playerClient = String(form.get('ytdlpPlayerClient') ?? '').trim();
+		if (playerClient === '' || /^[A-Za-z0-9_+,-]+$/.test(playerClient)) {
+			patch.ytdlpPlayerClient = playerClient;
+		} else {
+			return fail(400, {
+				error: 'Player client may only contain letters, digits, _ + - and commas.'
+			});
+		}
+
 		return { settings: updateSettings(patch), saved: true };
 	}
 };

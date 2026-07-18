@@ -93,7 +93,7 @@ export const actions: Actions = {
 	/** Final step: persist the chosen music library path. Requires the session from `connect`. */
 	library: async ({ request, locals }) => {
 		if (!locals.session)
-			return fail(401, { step: 'library', error: 'Session expired — log in again.' });
+			return fail(401, { step: 'library', error: 'Session expired - log in again.' });
 		const form = await request.formData();
 		const libraryPath = String(form.get('libraryPath') ?? '').trim();
 		if (!libraryPath) {

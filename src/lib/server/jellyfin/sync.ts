@@ -61,7 +61,7 @@ export function scheduleRefresh(db: DB = getDb()): void {
  * After a playlist batch drains: wait for Jellyfin's scan to pick the files
  * up, resolve each completed track to an item id, and create (or extend) the
  * playlist under the requesting user's account. Tracks that already existed
- * in the library resolve the same way — by path — so they are included too.
+ * in the library resolve the same way - by path - so they are included too.
  */
 export async function syncPlaylistBatch(
 	batchId: string,

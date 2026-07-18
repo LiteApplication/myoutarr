@@ -4,9 +4,9 @@
 Parses the same argv the real pipeline builds, emits realistic progress
 frames, and copies a pre-generated audio fixture (env FAKE_YTDLP_FIXTURE)
 into the requested output location. Env FAKE_YTDLP_MODE:
-  ok (default) — succeed
-  fail-permanent — exit 1 with a "Video unavailable" stderr
-  fail-transient — exit 1 with a network-ish stderr
+  ok (default) - succeed
+  fail-permanent - exit 1 with a "Video unavailable" stderr
+  fail-transient - exit 1 with a network-ish stderr
 """
 
 import json

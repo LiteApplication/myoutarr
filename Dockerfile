@@ -20,7 +20,16 @@ FROM node:26-alpine
 # reaping (we spawn yt-dlp/ffmpeg/python children); su-exec for PUID/PGID drop.
 RUN apk add --no-cache ffmpeg python3 py3-pip dumb-init su-exec shadow \
 	&& python3 -m venv /opt/venv \
-	&& /opt/venv/bin/pip install --no-cache-dir yt-dlp ytmusicapi mutagen
+	# yt-dlp[default] pulls the yt-dlp-ejs challenge-solver scripts; YouTube's
+	# signature/"n" challenge is solved by the Node runtime this image already
+	# ships (see YTDLP_JS_RUNTIMES below). Without both, yt-dlp discards every
+	# real format and fails with "Requested format is not available".
+	&& /opt/venv/bin/pip install --no-cache-dir 'yt-dlp[default]' ytmusicapi mutagen \
+	# bgutil PO Token provider plugin: yt-dlp auto-uses it to fetch GVS PO
+	# Tokens from the bgutil-provider server (see docker-compose.yml), so the
+	# web/web_music clients can serve audio. Keep this version in lockstep with
+	# the brainicism/bgutil-ytdlp-pot-provider image tag in the compose files.
+	&& /opt/venv/bin/pip install --no-cache-dir 'bgutil-ytdlp-pot-provider==1.3.1'
 
 WORKDIR /app
 COPY --from=build /app/build ./build
@@ -39,7 +48,11 @@ ENV NODE_ENV=production \
 	TAG_SCRIPT=/app/python/tag.py \
 	READ_TAGS_SCRIPT=/app/python/read_tags.py \
 	YTDLP_BIN=/opt/venv/bin/yt-dlp \
-	# uploads: SvelteKit's default body limit is 512KB — far too small for audio
+	# Use the image's Node for yt-dlp's JS challenge solver (yt-dlp defaults to
+	# Deno, which the Alpine image doesn't ship). Node 26 here satisfies EJS's
+	# Node >= 22 requirement.
+	YTDLP_JS_RUNTIMES=node \
+	# uploads: SvelteKit's default body limit is 512KB - far too small for audio
 	BODY_SIZE_LIMIT=524288000
 
 EXPOSE 8687

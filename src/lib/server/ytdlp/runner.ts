@@ -4,7 +4,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import type { DB } from '../db/index.ts';
 import { getDb } from '../db/index.ts';
-import { musicDir, scratchDir } from '../env.ts';
+import { musicDir, potProviderBaseUrl, scratchDir, ytdlpJsRuntimes } from '../env.ts';
 import { renderTemplate, resolveLibraryPath } from '../library/naming.ts';
 import { albumNfo, artistNfo } from '../library/nfo.ts';
 import { publishFile, writeSidecar } from '../library/publish.ts';
@@ -101,7 +101,9 @@ export class YtdlpPipeline implements JobRunner {
 			videoId: job.videoId,
 			scratchDir: scratch,
 			settings,
-			cookiesFile: resolveCookiesFile(owner, cookiesRoot)
+			cookiesFile: resolveCookiesFile(owner, cookiesRoot),
+			potProviderBaseUrl: potProviderBaseUrl(),
+			jsRuntimes: ytdlpJsRuntimes()
 		});
 		return new Promise<void>((resolve, reject) => {
 			const child = spawn(this.ytdlpBin, args, { stdio: ['ignore', 'pipe', 'pipe'], signal });
@@ -225,7 +227,7 @@ export class YtdlpPipeline implements JobRunner {
 			});
 		} catch (cause) {
 			const code = (cause as NodeJS.ErrnoException).code;
-			// Gluster brick outages surface as EIO/ESTALE — worth retrying later.
+			// Gluster brick outages surface as EIO/ESTALE - worth retrying later.
 			if (code === 'EIO' || code === 'ESTALE') {
 				throw new RetryableJobError(`library write failed (${code}): ${(cause as Error).message}`);
 			}

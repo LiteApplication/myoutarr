@@ -19,7 +19,7 @@ let fakeBin: string;
 
 beforeAll(() => {
 	if (!existsSync(FIXTURE)) {
-		// 2 seconds of A440 — a real, taggable Opus file.
+		// 2 seconds of A440 - a real, taggable Opus file.
 		execFileSync('ffmpeg', [
 			'-y',
 			'-loglevel',

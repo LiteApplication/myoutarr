@@ -7,7 +7,7 @@
 </script>
 
 <svelte:head>
-	<title>Sign in — myoutarr</title>
+	<title>Sign in - myoutarr</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center bg-canvas px-4">

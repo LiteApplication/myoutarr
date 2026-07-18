@@ -8,7 +8,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.artist.name} — myoutarr</title>
+	<title>{data.artist.name} - myoutarr</title>
 </svelte:head>
 
 <header class="mb-8 flex flex-col items-start gap-6 sm:flex-row sm:items-end">

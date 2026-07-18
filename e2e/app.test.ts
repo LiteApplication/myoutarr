@@ -30,7 +30,7 @@ test('setup wizard: connect, authenticate, pick a library', async ({ page }) => 
 	await page.getByRole('button', { name: 'Test connection' }).click();
 	await expect(page.getByText('Connected to MockFlix')).toBeVisible();
 
-	// Step 2: credentials (wrong password first — must surface an error).
+	// Step 2: credentials (wrong password first - must surface an error).
 	await page.getByLabel('Username').fill('admin');
 	await page.getByLabel('Password').fill('wrong');
 	await page.getByRole('button', { name: 'Sign in and continue' }).click();

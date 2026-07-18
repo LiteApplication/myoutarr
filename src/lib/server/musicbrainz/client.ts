@@ -127,7 +127,7 @@ export async function findRelease(
 		return null;
 	}
 
-	// Second (rate-limited) call for genres — the whole reason we're here.
+	// Second (rate-limited) call for genres - the whole reason we're here.
 	const lookup = await mbFetch<RgLookupResponse>(
 		`/release-group/${best.id}?inc=genres&fmt=json`,
 		fetchImpl

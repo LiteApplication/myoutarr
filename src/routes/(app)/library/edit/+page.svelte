@@ -17,7 +17,7 @@
 </script>
 
 <svelte:head>
-	<title>Edit tags — myoutarr</title>
+	<title>Edit tags - myoutarr</title>
 </svelte:head>
 
 <div class="mx-auto max-w-xl">

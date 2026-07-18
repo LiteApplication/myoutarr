@@ -8,7 +8,7 @@
 </script>
 
 <svelte:head>
-	<title>Cookies — myoutarr</title>
+	<title>Cookies - myoutarr</title>
 </svelte:head>
 
 <div class="mx-auto max-w-2xl">

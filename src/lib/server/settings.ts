@@ -20,6 +20,14 @@ export interface Settings {
 	jellyfinRefresh: boolean;
 	/** Optional yt-dlp rate limit, e.g. "4M". Empty = unlimited. */
 	rateLimit: string;
+	/**
+	 * yt-dlp YouTube player client(s), passed as
+	 * `--extractor-args youtube:player_client=<value>`. Overrides yt-dlp's default
+	 * client selection, which for music.youtube.com URLs is `web_music` - a client
+	 * that now demands a GVS PO Token and otherwise yields no audio formats
+	 * ("Requested format is not available"). Comma-separated; empty = yt-dlp default.
+	 */
+	ytdlpPlayerClient: string;
 	/** Jellyfin server URL, set during the setup wizard. */
 	jellyfinUrl: string;
 	/** Jellyfin library path for music, chosen during setup. */
@@ -36,6 +44,7 @@ export const defaults: Settings = {
 	musicBrainz: true,
 	jellyfinRefresh: true,
 	rateLimit: '',
+	ytdlpPlayerClient: '',
 	jellyfinUrl: '',
 	jellyfinLibraryPath: ''
 };

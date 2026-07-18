@@ -66,7 +66,7 @@
 </script>
 
 <svelte:head>
-	<title>Logs — myoutarr</title>
+	<title>Logs - myoutarr</title>
 </svelte:head>
 
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">

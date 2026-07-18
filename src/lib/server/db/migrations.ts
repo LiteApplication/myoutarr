@@ -1,9 +1,9 @@
 /**
  * Sequential migrations, applied in order and tracked via PRAGMA user_version.
- * Never edit an entry after release — append a new one.
+ * Never edit an entry after release - append a new one.
  */
 export const migrations: string[] = [
-	// 1 — initial schema
+	// 1 - initial schema
 	`
 	CREATE TABLE settings (
 		key   TEXT PRIMARY KEY,

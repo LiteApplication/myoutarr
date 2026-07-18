@@ -17,14 +17,14 @@
 </script>
 
 <svelte:head>
-	<title>Upload — myoutarr</title>
+	<title>Upload - myoutarr</title>
 </svelte:head>
 
 <div class="mx-auto max-w-xl">
 	<h1 class="text-3xl font-bold">Upload music</h1>
 	<p class="mt-1 text-sm text-ink-muted">
 		Add your own files to the library. They are tagged, filed by the naming template, and given NFOs
-		— exactly like downloaded tracks.
+		- exactly like downloaded tracks.
 	</p>
 
 	<form

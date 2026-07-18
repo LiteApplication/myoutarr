@@ -7,7 +7,7 @@
 	let submitting = $state(false);
 	// URL carried from the successful test into the credentials step.
 	let testedUrl = $derived(form && 'url' in form && form.url ? String(form.url) : '');
-	// Once the connection test succeeds, stay on the credentials step — a
+	// Once the connection test succeeds, stay on the credentials step - a
 	// failed sign-in attempt must not collapse the wizard back to step 1.
 	let credentialsStep = $derived(
 		Boolean(form && (('ok' in form && form.ok) || ('step' in form && form.step === 'connect')))
@@ -18,7 +18,7 @@
 </script>
 
 <svelte:head>
-	<title>Setup — myoutarr</title>
+	<title>Setup - myoutarr</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center bg-canvas px-4">
@@ -27,7 +27,7 @@
 			<h1 class="text-2xl font-bold text-ink">Welcome to myoutarr</h1>
 			<p class="mt-1 text-sm text-ink-muted">
 				{data.phase === 'library'
-					? 'Almost done — choose where music should be saved.'
+					? 'Almost done - choose where music should be saved.'
 					: 'Connect your Jellyfin server to get started.'}
 			</p>
 		</div>

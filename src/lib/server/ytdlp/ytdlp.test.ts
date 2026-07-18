@@ -6,7 +6,8 @@ const settings = {
 	audioFormat: 'opus' as const,
 	audioQuality: 0,
 	sponsorBlock: true,
-	rateLimit: ''
+	rateLimit: '',
+	ytdlpPlayerClient: 'tv'
 };
 
 describe('buildYtdlpArgs', () => {
@@ -51,6 +52,70 @@ describe('buildYtdlpArgs', () => {
 				settings: { ...settings, rateLimit: '4M; rm -rf /' }
 			})
 		).toThrow(/invalid rate limit/);
+	});
+
+	it('passes the player client as extractor-args and validates it', () => {
+		const args = buildYtdlpArgs({ videoId: 'IluRBvnYMoY', scratchDir: '/s', settings });
+		expect(args).toContain('--extractor-args');
+		expect(args).toContain('youtube:player_client=tv');
+		// Empty means: let yt-dlp pick its own default.
+		expect(
+			buildYtdlpArgs({
+				videoId: 'IluRBvnYMoY',
+				scratchDir: '/s',
+				settings: { ...settings, ytdlpPlayerClient: '' }
+			})
+		).not.toContain('--extractor-args');
+		expect(() =>
+			buildYtdlpArgs({
+				videoId: 'IluRBvnYMoY',
+				scratchDir: '/s',
+				settings: { ...settings, ytdlpPlayerClient: 'tv; rm -rf /' }
+			})
+		).toThrow(/invalid player client/);
+	});
+
+	it('passes js-runtimes when supplied and validates it', () => {
+		const args = buildYtdlpArgs({
+			videoId: 'IluRBvnYMoY',
+			scratchDir: '/s',
+			settings,
+			jsRuntimes: 'node'
+		});
+		expect(args).toContain('--js-runtimes');
+		expect(args).toContain('node');
+		expect(() =>
+			buildYtdlpArgs({
+				videoId: 'IluRBvnYMoY',
+				scratchDir: '/s',
+				settings,
+				jsRuntimes: 'node; rm -rf /'
+			})
+		).toThrow(/invalid js runtimes/);
+	});
+
+	it('wires the POT provider base_url when supplied and validates it', () => {
+		const args = buildYtdlpArgs({
+			videoId: 'IluRBvnYMoY',
+			scratchDir: '/s',
+			settings,
+			potProviderBaseUrl: 'http://bgutil-provider:4416/'
+		});
+		// Trailing slash stripped.
+		expect(args).toContain('youtubepot-bgutilhttp:base_url=http://bgutil-provider:4416');
+		// Absent by default.
+		const noProvider = buildYtdlpArgs({ videoId: 'IluRBvnYMoY', scratchDir: '/s', settings });
+		expect(noProvider.some((a) => a.includes('youtubepot-bgutilhttp'))).toBe(false);
+		for (const bad of ['not-a-url', 'ftp://x', 'file:///etc/passwd']) {
+			expect(() =>
+				buildYtdlpArgs({
+					videoId: 'IluRBvnYMoY',
+					scratchDir: '/s',
+					settings,
+					potProviderBaseUrl: bad
+				})
+			).toThrow(/invalid POT provider URL/);
+		}
 	});
 
 	it('omits sponsorblock and cookies unless enabled', () => {

@@ -8,7 +8,7 @@
 </script>
 
 <svelte:head>
-	<title>Settings — myoutarr</title>
+	<title>Settings - myoutarr</title>
 </svelte:head>
 
 <div class="mx-auto max-w-2xl">
@@ -55,7 +55,7 @@
 			</div>
 			<p class="mt-3 rounded-lg bg-warn/10 px-3 py-2 text-xs text-warn">
 				Honesty note: YouTube serves lossy audio (Opus/AAC). Choosing FLAC re-encodes that lossy
-				source into a much larger file with zero quality gain — it will not make a lossless library.
+				source into a much larger file with zero quality gain - it will not make a lossless library.
 			</p>
 		</section>
 
@@ -93,6 +93,23 @@
 						value={settings.rateLimit}
 						class="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-ink placeholder:text-ink-faint focus:border-accent"
 					/>
+				</label>
+				<label class="block sm:col-span-2">
+					<span class="mb-1 block text-sm text-ink-muted">yt-dlp player client</span>
+					<input
+						name="ytdlpPlayerClient"
+						type="text"
+						placeholder="(yt-dlp default)"
+						value={settings.ytdlpPlayerClient}
+						class="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-accent"
+					/>
+					<span class="mt-1 block text-xs text-ink-faint">
+						Which YouTube client yt-dlp impersonates. Leave <strong>empty</strong> when the bgutil
+						PO Token provider (<code>POT_PROVIDER_BASE_URL</code>) is running — yt-dlp's default web
+						client gets its token automatically. Only override this if you run without the provider:
+						<code>tv</code> needs no token but is currently often DRM-blocked, so try
+						<code>tv,web_safari</code> or <code>default</code>.
+					</span>
 				</label>
 			</div>
 			<label class="mt-4 flex items-center gap-3">

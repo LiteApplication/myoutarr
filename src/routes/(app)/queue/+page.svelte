@@ -17,7 +17,7 @@
 </script>
 
 <svelte:head>
-	<title>Queue — myoutarr</title>
+	<title>Queue - myoutarr</title>
 </svelte:head>
 
 <div class="mb-6 flex items-center justify-between">
@@ -39,7 +39,7 @@
 </div>
 
 {#if queue.batches.length === 0}
-	<p class="mt-16 text-center text-ink-muted">Nothing here yet — find an album and hit download.</p>
+	<p class="mt-16 text-center text-ink-muted">Nothing here yet - find an album and hit download.</p>
 {/if}
 
 <div class="space-y-6">

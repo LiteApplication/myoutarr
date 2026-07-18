@@ -335,7 +335,7 @@ interface LogRow {
 
 /**
  * Recent job history: jobs that have reached a terminal state, most recently
- * finished first. Backs the Logs view — reads straight from the job table, no
+ * finished first. Backs the Logs view - reads straight from the job table, no
  * separate log store needed.
  */
 export function listRecentJobs(db: DB = getDb(), limit = 200): LogEntry[] {

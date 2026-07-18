@@ -34,6 +34,26 @@ export function stagingDir(): string {
 	return path.join(musicDir(), '.myoutarr-staging');
 }
 
+/**
+ * Base URL of the bgutil PO Token provider HTTP server, if one is deployed
+ * (see docker-compose.yml). Empty/unset means no provider - yt-dlp falls back
+ * to whatever player client works without a token.
+ */
+export function potProviderBaseUrl(): string | undefined {
+	const url = process.env.POT_PROVIDER_BASE_URL?.trim();
+	return url ? url : undefined;
+}
+
+/**
+ * yt-dlp `--js-runtimes` value (e.g. "node"). Selects the JavaScript runtime
+ * yt-dlp uses for YouTube's signature/n-challenge solver. Unset means yt-dlp's
+ * default (Deno).
+ */
+export function ytdlpJsRuntimes(): string | undefined {
+	const value = process.env.YTDLP_JS_RUNTIMES?.trim();
+	return value ? value : undefined;
+}
+
 export function requireAdmin(): boolean {
 	return (process.env.REQUIRE_ADMIN ?? 'true').toLowerCase() !== 'false';
 }

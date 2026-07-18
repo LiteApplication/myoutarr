@@ -5,7 +5,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 /**
- * POST /api/queue/pause | resume — whole queue
+ * POST /api/queue/pause | resume - whole queue
  * POST /api/queue/cancel  { batchId } or { jobId }
  * POST /api/queue/retry   { jobId }
  */

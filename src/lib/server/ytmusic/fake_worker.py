@@ -2,9 +2,9 @@
 """Stdlib-only stand-in for ytm_worker.py used by unit tests.
 
 Modes (first argv):
-  echo   — replies {"result": {"method": ..., "params": ...}} to every frame
-  crash  — replies to the first frame, then exits 1
-  silent — never replies (for timeout tests)
+  echo   - replies {"result": {"method": ..., "params": ...}} to every frame
+  crash  - replies to the first frame, then exits 1
+  silent - never replies (for timeout tests)
 """
 
 import json

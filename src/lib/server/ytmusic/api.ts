@@ -63,7 +63,7 @@ export interface AlbumDetail {
 	duration: string | null;
 	thumbnails: Thumbnail[];
 	tracks: AlbumTrack[];
-	/** Audio playlist id — what yt-dlp downloads when fetching the whole album. */
+	/** Audio playlist id - what yt-dlp downloads when fetching the whole album. */
 	audioPlaylistId: string | null;
 }
 

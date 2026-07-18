@@ -16,14 +16,14 @@ if [ "$(id -u)" = "0" ]; then
 
 	mkdir -p /config/scratch
 	chown -R "$PUID:$PGID" /config
-	# /music is a shared volume — only ensure top-level access, never recurse
+	# /music is a shared volume - only ensure top-level access, never recurse
 	# (a recursive chown over a large Gluster library would be brutal).
 	chown "$PUID:$PGID" /music 2> /dev/null || true
 
 	# Optional: refresh yt-dlp without a rebuild (YouTube breaks it regularly).
 	if [ "${YTDLP_AUTO_UPDATE:-false}" = "true" ]; then
 		echo "Updating yt-dlp..."
-		/opt/venv/bin/pip install --no-cache-dir -U yt-dlp || echo "yt-dlp update failed; keeping bundled version"
+		/opt/venv/bin/pip install --no-cache-dir -U 'yt-dlp[default]' || echo "yt-dlp update failed; keeping bundled version"
 	fi
 
 	exec su-exec "$PUID:$PGID" "$@"

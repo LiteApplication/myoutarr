@@ -20,7 +20,7 @@
 </script>
 
 <svelte:head>
-	<title>Library — myoutarr</title>
+	<title>Library - myoutarr</title>
 </svelte:head>
 
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">

@@ -7,7 +7,7 @@ export const MOUNT_SENTINEL = '.myoutarr-mount-ok';
 export class MountMissingError extends Error {
 	constructor(root: string) {
 		super(
-			`Music volume sentinel missing at ${path.join(root, MOUNT_SENTINEL)} — ` +
+			`Music volume sentinel missing at ${path.join(root, MOUNT_SENTINEL)} - ` +
 				'refusing to write. Is the GlusterFS mount up?'
 		);
 		this.name = 'MountMissingError';
@@ -35,7 +35,7 @@ export function createSentinel(root: string = musicDir()): void {
 /**
  * Publish a finished, fully-tagged file into the library:
  *   1. copy from node-local scratch into staging *on the library volume*
- *   2. rename() into place — intra-volume, therefore atomic
+ *   2. rename() into place - intra-volume, therefore atomic
  *
  * A direct rename from scratch would cross filesystems (EXDEV) and degrade to
  * a non-atomic copy that Jellyfin could scan half-written. Never do that.

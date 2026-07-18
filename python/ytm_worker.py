@@ -7,7 +7,7 @@ Speaks newline-delimited JSON-RPC over stdin/stdout:
     <- {"id": 2, "error": {"message": "..."}}
 
 One process serves all requests; a small thread pool keeps concurrent
-searches from serialising. stdout is reserved for protocol frames —
+searches from serialising. stdout is reserved for protocol frames -
 anything else (logs, tracebacks) goes to stderr.
 """
 

@@ -15,7 +15,7 @@ let instance: DB | null = null;
 export function openDatabase(file: string): DB {
 	mkdirSync(path.dirname(file), { recursive: true });
 	const db = new Database(file);
-	// WAL is safe here because /config is documented as node-local storage —
+	// WAL is safe here because /config is documented as node-local storage -
 	// it must never live on GlusterFS/NFS (shared-memory mmap breaks there).
 	db.pragma('journal_mode = WAL');
 	db.pragma('synchronous = NORMAL');

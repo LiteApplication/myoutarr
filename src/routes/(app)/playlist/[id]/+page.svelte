@@ -28,7 +28,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.playlist.title} — myoutarr</title>
+	<title>{data.playlist.title} - myoutarr</title>
 </svelte:head>
 
 <header class="mb-8 flex flex-col items-start gap-6 sm:flex-row sm:items-end">

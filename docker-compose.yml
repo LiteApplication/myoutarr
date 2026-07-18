@@ -11,7 +11,22 @@ services:
       PGID: '1000'
       TZ: Europe/Paris
       YTDLP_AUTO_UPDATE: 'false'
+      # PO Token provider: lets yt-dlp's web/web_music clients serve audio again
+      # (fixes "Requested format is not available"). Points at the sibling
+      # service below. Remove it (and the service) to disable.
+      POT_PROVIDER_BASE_URL: 'http://bgutil-provider:4416'
     volumes:
       - ./config:/config
       - /path/to/your/music:/music
     restart: unless-stopped
+    depends_on:
+      - bgutil-provider
+
+  # bgutil PO Token provider - https://github.com/Brainicism/bgutil-ytdlp-pot-provider
+  # Keep the image tag in lockstep with the plugin version pinned in the Dockerfile.
+  bgutil-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:1.3.1
+    container_name: bgutil-provider
+    init: true
+    restart: unless-stopped
+    # No published ports needed: only myoutarr talks to it, over the compose network.

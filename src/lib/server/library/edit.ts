@@ -157,7 +157,7 @@ export async function ingestUpload(
 	assertMounted(root);
 	const ext = path.extname(fileName).slice(1).toLowerCase();
 	if (!UPLOAD_EXTENSIONS.has(ext)) {
-		throw new Error(`unsupported audio format .${ext} — use opus, m4a, mp3, flac, or ogg`);
+		throw new Error(`unsupported audio format .${ext} - use opus, m4a, mp3, flac, or ogg`);
 	}
 	// Land it in a dotted (scanner-invisible) intake dir on the library volume,
 	// so the applyTags move stays intra-filesystem and atomic.

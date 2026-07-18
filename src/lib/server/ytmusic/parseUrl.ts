@@ -4,7 +4,7 @@
  * song instead of running a text search. Works for unlisted playlists too:
  * the id is taken from the URL, never from search results.
  *
- * Pure and API-free — songs are classified by videoId only; resolving a song
+ * Pure and API-free - songs are classified by videoId only; resolving a song
  * to its album (the app has no song page) happens in the caller.
  */
 

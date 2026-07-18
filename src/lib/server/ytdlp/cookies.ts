@@ -69,7 +69,7 @@ export function deleteCookies(userId: string, root: string = configDir()): void 
 
 /**
  * Cheap sanity check that pasted text looks like a Netscape cookies.txt export.
- * We don't fully parse it — yt-dlp does — but we reject obviously wrong input
+ * We don't fully parse it - yt-dlp does - but we reject obviously wrong input
  * (e.g. an HTML page or JSON) so users get feedback before a download fails.
  */
 export function looksLikeCookiesFile(contents: string): boolean {

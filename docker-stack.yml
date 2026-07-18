@@ -5,12 +5,12 @@
 #      (e.g. /mnt/gluster/music via fstab with _netdev), and the stack
 #      bind-mounts that path. No volume plugin in the critical path.
 #   2. Pin the service to the node holding /config (SQLite must be on
-#      node-local storage — never on Gluster):
+#      node-local storage - never on Gluster):
 #        docker node update --label-add myoutarr=true <node>
 #   3. Secrets: nothing requires one today (sessions are opaque random ids in
 #      the local database, and Jellyfin tokens come from user logins). Any env
 #      var can still be provided as a Docker secret: mount it and set
-#      <NAME>_FILE=/run/secrets/<name> — the app reads secret files first.
+#      <NAME>_FILE=/run/secrets/<name> - the app reads secret files first.
 #
 # PUID/PGID must resolve to the same numeric ids on every Gluster node and in
 # Jellyfin's container, or Jellyfin cannot read what myoutarr writes.
@@ -25,8 +25,12 @@ services:
       PGID: '1000'
       TZ: Europe/Paris
       YTDLP_AUTO_UPDATE: 'false'
+      # PO Token provider (fixes "Requested format is not available"). Reaches the
+      # stateless bgutil-provider service below over the stack's overlay network;
+      # that service is unconstrained and may run on any node.
+      POT_PROVIDER_BASE_URL: 'http://bgutil-provider:4416'
     volumes:
-      # node-local: SQLite (WAL) + download scratch — must not be on Gluster
+      # node-local: SQLite (WAL) + download scratch - must not be on Gluster
       - /opt/myoutarr/config:/config
       # the shared library on the GlusterFS FUSE mountpoint
       - /mnt/gluster/music:/music
@@ -47,6 +51,18 @@ services:
           - node.labels.myoutarr == true
       update_config:
         order: stop-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+  # bgutil PO Token provider - https://github.com/Brainicism/bgutil-ytdlp-pot-provider
+  # Stateless: no volumes, no placement constraint, safe to reschedule anywhere.
+  # Keep the image tag in lockstep with the plugin version pinned in the Dockerfile.
+  bgutil-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:1.3.1
+    init: true
+    deploy:
+      replicas: 1
       restart_policy:
         condition: on-failure
         delay: 5s

@@ -63,7 +63,7 @@ export class WorkerPool {
 		this.poke();
 	}
 
-	/** Fill free slots with runnable jobs. Cheap and idempotent — call anytime. */
+	/** Fill free slots with runnable jobs. Cheap and idempotent - call anytime. */
 	poke(): void {
 		if (this.stopped) return;
 		while (this.active < this.concurrency()) {
