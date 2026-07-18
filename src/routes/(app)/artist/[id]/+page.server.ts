@@ -1,3 +1,4 @@
+import { isSubscribed } from '$lib/server/subscriptions/store';
 import { getArtist, getArtistAlbums } from '$lib/server/ytmusic/api';
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
@@ -11,7 +12,7 @@ export const load: PageServerLoad = async ({ params }) => {
 					() => artist.albums
 				)
 			: artist.albums;
-		return { artist, allAlbums };
+		return { artist, allAlbums, subscribed: isSubscribed(params.id) };
 	} catch (cause) {
 		error(502, `Could not load artist: ${(cause as Error).message}`);
 	}

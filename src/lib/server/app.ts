@@ -3,6 +3,10 @@ import { scheduleRefresh, syncPlaylistBatch } from './jellyfin/sync.ts';
 import { enrichMeta } from './musicbrainz/client.ts';
 import { WorkerPool } from './queue/worker.ts';
 import { getSettings } from './settings.ts';
+import {
+	startSubscriptionScheduler,
+	stopSubscriptionScheduler
+} from './subscriptions/scheduler.ts';
 import { stopYtMusic } from './ytmusic/client.ts';
 import { YtdlpPipeline } from './ytdlp/runner.ts';
 
@@ -43,7 +47,12 @@ export function getPool(): WorkerPool {
 		});
 		pool.start();
 
+		// Daily check for new releases from subscribed artists; enqueued batches
+		// are picked up by poking this same pool.
+		startSubscriptionScheduler(() => pool?.poke());
+
 		const shutdown = () => {
+			stopSubscriptionScheduler();
 			void pool?.stop();
 			stopYtMusic();
 		};
@@ -53,8 +62,18 @@ export function getPool(): WorkerPool {
 	return pool;
 }
 
+/**
+ * Ensure background services (worker pool, subscription scheduler) are running.
+ * Called from `hooks.server.ts` so orphan recovery and the daily subscription
+ * check start when the app is first used, not only on the first enqueue.
+ */
+export function ensureServices(): void {
+	if (!building) getPool();
+}
+
 /** Test hook. */
 export function resetApp(): void {
+	stopSubscriptionScheduler();
 	pool = null;
 	batchDrainedHandlers = [];
 }

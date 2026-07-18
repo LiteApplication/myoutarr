@@ -32,6 +32,10 @@ export interface Settings {
 	jellyfinUrl: string;
 	/** Jellyfin library path for music, chosen during setup. */
 	jellyfinLibraryPath: string;
+	/** Auto-download new releases from subscribed artists on a schedule. */
+	subscriptionsEnabled: boolean;
+	/** How often (hours) to poll a subscribed artist for new releases. */
+	subscriptionCheckHours: number;
 }
 
 export const defaults: Settings = {
@@ -46,7 +50,9 @@ export const defaults: Settings = {
 	rateLimit: '',
 	ytdlpPlayerClient: '',
 	jellyfinUrl: '',
-	jellyfinLibraryPath: ''
+	jellyfinLibraryPath: '',
+	subscriptionsEnabled: true,
+	subscriptionCheckHours: 24
 };
 
 export function getSettings(db: DB = getDb()): Settings {

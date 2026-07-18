@@ -26,3 +26,6 @@ test-results/
 playwright-report/
 coverage/
 .venv/
+
+# node-local runtime data (SQLite DB, scratch) - never commit
+config/

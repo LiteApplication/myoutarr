@@ -25,6 +25,11 @@
 			icon: 'M4 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5zM8 3v18M15 10.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z'
 		},
 		{
+			href: '/subscriptions',
+			label: 'Subscriptions',
+			icon: 'M9 19V6l12-3v13M9 19a3 3 0 11-6 0 3 3 0 016 0zm12-3a3 3 0 11-6 0 3 3 0 016 0z'
+		},
+		{
 			href: '/cookies',
 			label: 'Cookies',
 			icon: 'M12 2a10 10 0 1010 10 4 4 0 01-5-5 4 4 0 01-5-5zM8.5 10.5h.01M15 14h.01M10.5 15.5h.01'

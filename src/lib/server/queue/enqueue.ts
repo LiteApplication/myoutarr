@@ -1,13 +1,7 @@
 import type { DB } from '../db/index.ts';
 import { getDb } from '../db/index.ts';
 import { publish } from '../events.ts';
-import {
-	getAlbum,
-	getArtist,
-	getArtistAlbums,
-	getPlaylist,
-	type AlbumDetail
-} from '../ytmusic/api.ts';
+import { getAlbum, getArtistReleases, getPlaylist, type AlbumDetail } from '../ytmusic/api.ts';
 import type { Batch, JobMeta, NewTrack } from './store.ts';
 import { createBatch } from './store.ts';
 
@@ -36,6 +30,36 @@ function albumTrackMeta(album: AlbumDetail): NewTrack[] {
 				albumBrowseId: album.browseId
 			} satisfies JobMeta
 		}));
+}
+
+/**
+ * Enqueue a single album by its browseId as one batch. Returns the batch, or
+ * `null` when the album resolves but has no downloadable tracks. Throws when the
+ * album itself can't be fetched, so callers can distinguish a transient failure
+ * (retry later) from an empty release (skip permanently).
+ */
+export async function enqueueAlbumById(
+	browseId: string,
+	userId: string,
+	fallbackArtist: string | undefined,
+	db: DB = getDb()
+): Promise<Batch | null> {
+	const album = await getAlbum(browseId);
+	const tracks = albumTrackMeta(album);
+	if (tracks.length === 0) return null;
+	const { batch } = createBatch(
+		{
+			kind: 'album',
+			sourceId: album.browseId,
+			title: album.title,
+			artist: album.artists[0]?.name ?? fallbackArtist,
+			thumbnail: album.thumbnails.at(-1)?.url,
+			createdBy: userId
+		},
+		tracks,
+		db
+	);
+	return batch;
 }
 
 /**
@@ -125,37 +149,20 @@ export async function enqueue(
 		}
 
 		case 'artist': {
-			const artist = await getArtist(request.browseId);
-			const releases = artist.albumsParams
-				? await getArtistAlbums(artist.albumsParams.browseId, artist.albumsParams.params).catch(
-						() => artist.albums
-					)
-				: artist.albums;
-			const all = [...releases, ...artist.singles];
-			if (all.length === 0) throw new Error('artist has no downloadable releases');
+			const artist = await getArtistReleases(request.browseId);
+			if (artist.releases.length === 0) throw new Error('artist has no downloadable releases');
 			// Fetch album details with modest parallelism; skip releases that 404.
 			const CHUNK = 4;
-			for (let i = 0; i < all.length; i += CHUNK) {
+			for (let i = 0; i < artist.releases.length; i += CHUNK) {
 				const details = await Promise.all(
-					all.slice(i, i + CHUNK).map((release) => getAlbum(release.browseId).catch(() => null))
+					artist.releases
+						.slice(i, i + CHUNK)
+						.map((release) =>
+							enqueueAlbumById(release.browseId, userId, artist.name, db).catch(() => null)
+						)
 				);
-				for (const album of details) {
-					if (!album) continue;
-					const tracks = albumTrackMeta(album);
-					if (tracks.length === 0) continue;
-					const { batch } = createBatch(
-						{
-							kind: 'album',
-							sourceId: album.browseId,
-							title: album.title,
-							artist: album.artists[0]?.name ?? artist.name,
-							thumbnail: album.thumbnails.at(-1)?.url,
-							createdBy: userId
-						},
-						tracks,
-						db
-					);
-					batches.push(batch);
+				for (const batch of details) {
+					if (batch) batches.push(batch);
 				}
 			}
 			break;
