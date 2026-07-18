@@ -2,10 +2,18 @@
 	import { page } from '$app/state';
 	import QueueBar from '$lib/components/QueueBar.svelte';
 	import type { LayoutData } from './$types';
+	import { fade, fly } from 'svelte/transition';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
 
 	let query = $state(page.url.searchParams.get('q') ?? '');
+
+	// Mobile navigation drawer. Closes on every navigation so a tapped link
+	// never leaves the overlay hanging over the new page.
+	let menuOpen = $state(false);
+	$effect(() => {
+		if (page.url.pathname) menuOpen = false;
+	});
 
 	const navItems = [
 		{ href: '/', label: 'Home', icon: 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10' },
@@ -46,6 +54,31 @@
 	}
 </script>
 
+{#snippet navLinks()}
+	{#each navItems as item (item.href)}
+		<a
+			href={item.href}
+			class="flex items-center gap-4 rounded-lg px-3 py-2.5 text-sm transition
+				{isActive(item.href)
+				? 'bg-surface-2 font-medium text-ink'
+				: 'text-ink-muted hover:bg-surface-2/60 hover:text-ink'}"
+		>
+			<svg
+				viewBox="0 0 24 24"
+				class="h-5 w-5 shrink-0"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d={item.icon} />
+			</svg>
+			{item.label}
+		</a>
+	{/each}
+{/snippet}
+
 <div class="flex min-h-screen bg-canvas text-ink">
 	<!-- Left rail -->
 	<nav
@@ -60,28 +93,7 @@
 			<span class="font-display text-xl font-semibold tracking-tight">myoutarr</span>
 		</a>
 		<div class="mt-2 flex flex-col gap-1 px-3">
-			{#each navItems as item (item.href)}
-				<a
-					href={item.href}
-					class="flex items-center gap-4 rounded-lg px-3 py-2.5 text-sm transition
-						{isActive(item.href)
-						? 'bg-surface-2 font-medium text-ink'
-						: 'text-ink-muted hover:bg-surface-2/60 hover:text-ink'}"
-				>
-					<svg
-						viewBox="0 0 24 24"
-						class="h-5 w-5 shrink-0"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.8"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path d={item.icon} />
-					</svg>
-					{item.label}
-				</a>
-			{/each}
+			{@render navLinks()}
 		</div>
 		<form action="/logout" method="POST" class="mt-auto p-4">
 			<p class="mb-2 truncate px-2 text-xs text-ink-faint">{data.userName}</p>
@@ -100,7 +112,23 @@
 		<header
 			class="sticky top-0 z-10 flex h-topbar items-center gap-4 border-b border-line bg-canvas/95 px-4 backdrop-blur md:px-8"
 		>
-			<a href="/" class="font-bold md:hidden">myoutarr</a>
+			<button
+				type="button"
+				onclick={() => (menuOpen = true)}
+				class="-ml-1 rounded-lg p-2 text-ink-muted transition hover:bg-surface-2 hover:text-ink md:hidden"
+				aria-label="Open menu"
+			>
+				<svg
+					viewBox="0 0 24 24"
+					class="h-6 w-6"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+				>
+					<path d="M4 6h16M4 12h16M4 18h16" />
+				</svg>
+			</button>
 			<form action="/search" method="GET" class="mx-auto w-full max-w-xl">
 				<div class="relative">
 					<svg
@@ -131,5 +159,62 @@
 		</main>
 	</div>
 </div>
+
+<!-- Mobile navigation drawer -->
+{#if menuOpen}
+	<div class="fixed inset-0 z-40 md:hidden">
+		<button
+			type="button"
+			class="absolute inset-0 bg-black/60"
+			aria-label="Close menu"
+			onclick={() => (menuOpen = false)}
+			transition:fade={{ duration: 150 }}
+		></button>
+		<nav
+			class="absolute inset-y-0 left-0 flex w-72 max-w-[80%] flex-col border-r border-line bg-canvas"
+			transition:fly={{ x: -288, duration: 200 }}
+		>
+			<div class="flex h-topbar items-center justify-between px-5">
+				<a href="/" class="flex items-center gap-2.5">
+					<span
+						class="font-display grid h-8 w-8 place-items-center rounded-lg bg-accent text-xl font-black italic text-accent-ink"
+					>
+						m
+					</span>
+					<span class="font-display text-xl font-semibold tracking-tight">myoutarr</span>
+				</a>
+				<button
+					type="button"
+					onclick={() => (menuOpen = false)}
+					class="rounded-lg p-2 text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+					aria-label="Close menu"
+				>
+					<svg
+						viewBox="0 0 24 24"
+						class="h-5 w-5"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+					>
+						<path d="M6 6l12 12M18 6L6 18" />
+					</svg>
+				</button>
+			</div>
+			<div class="mt-2 flex flex-col gap-1 px-3">
+				{@render navLinks()}
+			</div>
+			<form action="/logout" method="POST" class="mt-auto p-4">
+				<p class="mb-2 truncate px-2 text-xs text-ink-faint">{data.userName}</p>
+				<button
+					type="submit"
+					class="w-full rounded-lg px-3 py-2 text-left text-sm text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+				>
+					Sign out
+				</button>
+			</form>
+		</nav>
+	</div>
+{/if}
 
 <QueueBar />

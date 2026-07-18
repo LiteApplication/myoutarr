@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getAlbum, getArtist, getPlaylist, search } from './api.ts';
+import { getAlbum, getArtist, getPlaylist, getSong, search } from './api.ts';
 import type { YtMusicWorker } from './client.ts';
 
 /** Stub worker returning a canned payload for any call. */
@@ -110,6 +110,47 @@ describe('artist mapping', () => {
 		expect(artist.albums).toHaveLength(1);
 		expect(artist.albumsParams).toEqual({ browseId: 'UC1_albums', params: 'ggMIegYIARoCAQI' });
 		expect(artist.singlesParams).toBeNull();
+	});
+});
+
+describe('song mapping', () => {
+	it('maps the first watch track as the song and the rest as related', async () => {
+		const song = await getSong(
+			'v1',
+			stub({
+				tracks: [
+					{
+						videoId: 'v1',
+						title: 'One More Time',
+						artists: [{ name: 'Daft Punk', id: 'a1' }],
+						album: { name: 'Discovery', id: 'b1' },
+						length: '5:20',
+						thumbnail: [thumbnail]
+					},
+					{
+						videoId: 'v2',
+						title: 'Aerodynamic',
+						artists: [{ name: 'Daft Punk', id: 'a1' }],
+						album: { name: 'Discovery', id: 'b1' },
+						length: '3:27',
+						thumbnail: [thumbnail]
+					},
+					{ title: 'no video id → dropped' }
+				]
+			})
+		);
+		expect(song).toMatchObject({
+			videoId: 'v1',
+			title: 'One More Time',
+			duration: '5:20',
+			album: { name: 'Discovery', id: 'b1' }
+		});
+		expect(song.thumbnails).toEqual([thumbnail]);
+		expect(song.related.map((t) => t.videoId)).toEqual(['v2']);
+	});
+
+	it('throws when the watch queue is empty', async () => {
+		await expect(getSong('v1', stub({ tracks: [] }))).rejects.toThrow('song not found');
 	});
 });
 

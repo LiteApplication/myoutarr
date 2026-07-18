@@ -57,7 +57,9 @@
 							class="h-10 w-10 rounded object-cover bg-surface-3"
 						/>
 						<div class="min-w-0 flex-1">
-							<p class="truncate text-sm text-ink">{song.title}</p>
+							<a href="/song/{song.videoId}" class="block truncate text-sm text-ink hover:underline"
+								>{song.title}</a
+							>
 							<p class="truncate text-xs text-ink-muted">
 								{song.artists.map((a) => a.name).join(', ')}
 								{#if song.album}&nbsp;·&nbsp;{song.album.name}{/if}

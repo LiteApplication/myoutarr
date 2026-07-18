@@ -1,7 +1,13 @@
 import type { DB } from '../db/index.ts';
 import { getDb } from '../db/index.ts';
 import { publish } from '../events.ts';
-import { getAlbum, getArtistReleases, getPlaylist, type AlbumDetail } from '../ytmusic/api.ts';
+import {
+	getAlbum,
+	getArtistReleases,
+	getPlaylist,
+	getSong,
+	type AlbumDetail
+} from '../ytmusic/api.ts';
 import type { Batch, JobMeta, NewTrack } from './store.ts';
 import { createBatch } from './store.ts';
 
@@ -75,12 +81,30 @@ export async function enqueue(
 
 	switch (request.kind) {
 		case 'song': {
-			if (!request.albumBrowseId) {
-				throw new Error('song downloads need their album context (albumBrowseId)');
+			// Prefer the album context (gives real track numbers / total). Fall back to
+			// the song's own metadata for standalone tracks that belong to no album.
+			let track: NewTrack | undefined;
+			if (request.albumBrowseId) {
+				const album = await getAlbum(request.albumBrowseId);
+				track = albumTrackMeta(album).find((t) => t.videoId === request.videoId);
+				if (!track) throw new Error('track not found on its album (may be unavailable)');
+			} else {
+				const song = await getSong(request.videoId);
+				if (song.album?.id) {
+					const album = await getAlbum(song.album.id);
+					track = albumTrackMeta(album).find((t) => t.videoId === request.videoId);
+				}
+				track ??= {
+					videoId: request.videoId,
+					meta: {
+						title: song.title,
+						artist: song.artists.map((a) => a.name).join(', ') || 'Unknown Artist',
+						album: song.album?.name || song.title,
+						albumArtist: song.artists[0]?.name,
+						thumbnail: song.thumbnails.at(-1)?.url
+					}
+				};
 			}
-			const album = await getAlbum(request.albumBrowseId);
-			const track = albumTrackMeta(album).find((t) => t.videoId === request.videoId);
-			if (!track) throw new Error('track not found on its album (may be unavailable)');
 			const { batch } = createBatch(
 				{
 					kind: 'song',

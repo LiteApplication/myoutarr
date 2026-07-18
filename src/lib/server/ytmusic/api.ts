@@ -88,6 +88,17 @@ export interface PlaylistDetail {
 	tracks: SongResult[];
 }
 
+export interface SongDetail {
+	videoId: string;
+	title: string;
+	artists: { name: string; id: string | null }[];
+	album: { name: string; id: string | null } | null;
+	duration: string | null;
+	thumbnails: Thumbnail[];
+	/** Up-next tracks from the watch queue, shown as "related songs". */
+	related: SongResult[];
+}
+
 /* -------------------------------------------------------------------------- */
 /* Raw-shape helpers. ytmusicapi returns loosely-shaped dicts; every accessor  */
 /* below tolerates missing fields instead of trusting the upstream schema.     */
@@ -317,24 +328,47 @@ export async function getAlbum(
 	};
 }
 
-export interface SongResolution {
-	/** Album browseId (MPREb…) the song belongs to, when it has one. */
-	albumId: string | null;
-	title: string | null;
-	artist: string | null;
+/** Map a watch-playlist track (shape differs from search: `length`, `thumbnail`). */
+function mapWatchTrack(t: Raw): SongResult | null {
+	const videoId = str(t.videoId);
+	if (!videoId) return null;
+	const album = t.album as Raw | undefined;
+	return {
+		kind: 'song',
+		videoId,
+		title: str(t.title) ?? '(untitled)',
+		artists: artists(t.artists),
+		album: album ? { name: str(album.name) ?? '', id: str(album.id) } : null,
+		duration: str(t.length) ?? str(t.duration),
+		thumbnails: thumbnails(t.thumbnail ?? t.thumbnails)
+	};
 }
 
 /**
- * Resolve a bare videoId to its album, for navigating a pasted song URL.
- * Songs have no page of their own, so callers redirect to the album (or fall
- * back to a text search using the returned title/artist).
+ * Full detail for a single song's page. Songs have no page of their own in
+ * YT Music, so the watch queue stands in: its first track is the song, the rest
+ * are shown as related tracks.
  */
-export async function resolveSong(
+export async function getSong(
 	videoId: string,
 	worker: YtMusicWorker = getYtMusic()
-): Promise<SongResolution> {
-	const raw = await worker.call<Raw>('resolve_song', { id: videoId });
-	return { albumId: str(raw.albumId), title: str(raw.title), artist: str(raw.artist) };
+): Promise<SongDetail> {
+	const raw = await worker.call<Raw>('song_page', { id: videoId });
+	const tracks = arr(raw.tracks);
+	const self = tracks.length > 0 ? mapWatchTrack(tracks[0]) : null;
+	if (!self) throw new Error('song not found');
+	return {
+		videoId: self.videoId,
+		title: self.title,
+		artists: self.artists,
+		album: self.album,
+		duration: self.duration,
+		thumbnails: self.thumbnails,
+		related: tracks
+			.slice(1)
+			.map(mapWatchTrack)
+			.filter((t): t is SongResult => t !== null && t.videoId !== self.videoId)
+	};
 }
 
 export async function getPlaylist(
