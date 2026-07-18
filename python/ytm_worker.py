@@ -62,6 +62,25 @@ def _get_song(params):
     return ytm().get_song(params["id"])
 
 
+def _resolve_song(params):
+    """Resolve a videoId to its album (for URL navigation).
+
+    get_song() has no album field; the watch playlist's first track does.
+    Returns just what the caller needs to redirect: album browseId plus a
+    title/artist for the text-search fallback when the song has no album.
+    """
+    watch = ytm().get_watch_playlist(params["id"], limit=1)
+    tracks = watch.get("tracks") or []
+    track = tracks[0] if tracks else {}
+    album = track.get("album") or {}
+    artists = track.get("artists") or []
+    return {
+        "albumId": album.get("id"),
+        "title": track.get("title"),
+        "artist": artists[0].get("name") if artists else None,
+    }
+
+
 def _ping(_params):
     return "pong"
 
@@ -73,6 +92,7 @@ METHODS = {
     "get_album": _get_album,
     "get_playlist": _get_playlist,
     "get_song": _get_song,
+    "resolve_song": _resolve_song,
     "ping": _ping,
 }
 

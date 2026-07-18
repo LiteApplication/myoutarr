@@ -8,11 +8,13 @@ import { musicDir, scratchDir } from '../env.ts';
 import { renderTemplate, resolveLibraryPath } from '../library/naming.ts';
 import { albumNfo, artistNfo } from '../library/nfo.ts';
 import { publishFile, writeSidecar } from '../library/publish.ts';
+import { getJobOwner } from '../queue/store.ts';
 import type { Job, JobMeta } from '../queue/store.ts';
 import type { JobRunner, RunResult } from '../queue/worker.ts';
 import { RetryableJobError } from '../queue/worker.ts';
 import { getSettings } from '../settings.ts';
 import { buildYtdlpArgs } from './args.ts';
+import { resolveCookiesFile } from './cookies.ts';
 import { parseProgressLine } from './progress.ts';
 
 const AUDIO_EXTENSIONS = ['opus', 'm4a', 'mp3', 'flac', 'ogg', 'webm'];
@@ -28,6 +30,8 @@ export interface PipelineOptions {
 	libraryRoot?: string;
 	staging?: string;
 	scratchRoot?: string;
+	/** Directory holding per-account cookies (defaults to the config dir). */
+	cookiesRoot?: string;
 	/** Optional metadata enrichment hook (MusicBrainz); identity by default. */
 	enrich?: (meta: JobMeta) => Promise<JobMeta>;
 	fetchImpl?: typeof fetch;
@@ -90,15 +94,14 @@ export class YtdlpPipeline implements JobRunner {
 		signal: AbortSignal
 	): Promise<void> {
 		const settings = getSettings(this.db);
-		const cookies = path.join(
-			path.dirname(this.options.scratchRoot ?? scratchDir()),
-			'cookies.txt'
-		);
+		const cookiesRoot =
+			this.options.cookiesRoot ?? path.dirname(this.options.scratchRoot ?? scratchDir());
+		const owner = getJobOwner(job.id, this.db);
 		const args = buildYtdlpArgs({
 			videoId: job.videoId,
 			scratchDir: scratch,
 			settings,
-			cookiesFile: existsSync(cookies) ? cookies : undefined
+			cookiesFile: resolveCookiesFile(owner, cookiesRoot)
 		});
 		return new Promise<void>((resolve, reject) => {
 			const child = spawn(this.ytdlpBin, args, { stdio: ['ignore', 'pipe', 'pipe'], signal });

@@ -71,7 +71,7 @@ Gluster stores raw numeric UIDs. `PUID`/`PGID` must resolve to the **same numeri
 
 Any env var can be supplied as a Docker secret: set `<NAME>_FILE=/run/secrets/<name>` — secret files are read before plain env vars.
 
-A `cookies.txt` (Netscape format) placed in `/config` is passed to yt-dlp automatically, for age-restricted or premium content.
+Each user can upload their own YouTube `cookies.txt` (Netscape format) on the in-app **Cookies** page — stored per account under `/config/cookies/<userId>.txt` and passed to yt-dlp for that user's downloads, for age-restricted or premium content. The page links to browser-extension export instructions. A legacy shared `/config/cookies.txt` is still honoured as a fallback when a user has none.
 
 ## Development
 

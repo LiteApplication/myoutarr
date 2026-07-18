@@ -259,6 +259,18 @@ export function getJob(id: string, db: DB = getDb()): Job | null {
 	return row ? rowToJob(row) : null;
 }
 
+/** The user id (Jellyfin account) that enqueued the batch a job belongs to. */
+export function getJobOwner(jobId: string, db: DB = getDb()): string | null {
+	const row = db
+		.prepare(
+			`SELECT b.created_by AS created_by
+			 FROM jobs j JOIN batches b ON b.id = j.batch_id
+			 WHERE j.id = ?`
+		)
+		.get(jobId) as { created_by: string } | undefined;
+	return row?.created_by ?? null;
+}
+
 export interface BatchWithJobs extends Batch {
 	jobs: Job[];
 }

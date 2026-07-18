@@ -271,6 +271,26 @@ export async function getAlbum(
 	};
 }
 
+export interface SongResolution {
+	/** Album browseId (MPREb…) the song belongs to, when it has one. */
+	albumId: string | null;
+	title: string | null;
+	artist: string | null;
+}
+
+/**
+ * Resolve a bare videoId to its album, for navigating a pasted song URL.
+ * Songs have no page of their own, so callers redirect to the album (or fall
+ * back to a text search using the returned title/artist).
+ */
+export async function resolveSong(
+	videoId: string,
+	worker: YtMusicWorker = getYtMusic()
+): Promise<SongResolution> {
+	const raw = await worker.call<Raw>('resolve_song', { id: videoId });
+	return { albumId: str(raw.albumId), title: str(raw.title), artist: str(raw.artist) };
+}
+
 export async function getPlaylist(
 	browseId: string,
 	worker: YtMusicWorker = getYtMusic()
