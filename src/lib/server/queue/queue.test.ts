@@ -12,6 +12,7 @@ import {
 	createBatch,
 	failJob,
 	listQueue,
+	listRecentJobs,
 	pauseQueue,
 	recoverOrphans,
 	resumeQueue,
@@ -30,6 +31,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	vi.useRealTimers();
 	db.close();
 	rmSync(dir, { recursive: true, force: true });
 });
@@ -155,6 +157,30 @@ describe('queue store', () => {
 		expect(stored.status).toBe('completed');
 		expect(stored.progress).toBe(1);
 		expect(stored.outputPath).toBe('/music/A/B/01 - Track 0.opus');
+	});
+
+	it('lists only terminal jobs as recent history, most recent first', () => {
+		vi.useFakeTimers();
+		makeBatch(3);
+		const a = claimNextJob(db)!;
+		vi.setSystemTime(1000);
+		completeJob(a.id, '/music/x.opus', db);
+		const b = claimNextJob(db)!;
+		vi.setSystemTime(2000); // b finishes strictly after a
+		failJob(b.id, 'boom', { maxRetries: 0, retryable: false }, db);
+		// third job stays queued and must not appear in the log
+
+		const log = listRecentJobs(db);
+		expect(log).toHaveLength(2);
+		expect(log.every((e) => e.status !== 'queued')).toBe(true);
+		// finished_at DESC → the failure (finished last) comes first
+		expect(log[0].id).toBe(b.id);
+		expect(log[0].status).toBe('failed');
+		expect(log[0].error).toBe('boom');
+		expect(log[0].title).toBe('Track 1');
+		expect(log[0].batchTitle).toBe('Album');
+		expect(log[1].id).toBe(a.id);
+		expect(log[1].outputPath).toBe('/music/x.opus');
 	});
 });
 

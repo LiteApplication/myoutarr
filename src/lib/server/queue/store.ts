@@ -302,6 +302,74 @@ export function listQueue(db: DB = getDb(), limit = 50): BatchWithJobs[] {
 	}));
 }
 
+export interface LogEntry {
+	id: string;
+	status: JobStatus;
+	attempts: number;
+	error: string | null;
+	startedAt: number | null;
+	finishedAt: number | null;
+	outputPath: string | null;
+	title: string;
+	artist: string;
+	batchId: string;
+	batchTitle: string;
+	batchKind: BatchKind;
+	thumbnail: string | null;
+}
+
+interface LogRow {
+	id: string;
+	status: JobStatus;
+	attempts: number;
+	error: string | null;
+	started_at: number | null;
+	finished_at: number | null;
+	output_path: string | null;
+	meta: string;
+	batch_id: string;
+	batch_title: string;
+	batch_kind: BatchKind;
+	batch_thumbnail: string | null;
+}
+
+/**
+ * Recent job history: jobs that have reached a terminal state, most recently
+ * finished first. Backs the Logs view — reads straight from the job table, no
+ * separate log store needed.
+ */
+export function listRecentJobs(db: DB = getDb(), limit = 200): LogEntry[] {
+	const rows = db
+		.prepare(
+			`SELECT j.id, j.status, j.attempts, j.error, j.started_at, j.finished_at,
+			        j.output_path, j.meta, j.batch_id,
+			        b.title AS batch_title, b.kind AS batch_kind, b.thumbnail AS batch_thumbnail
+			 FROM jobs j JOIN batches b ON b.id = j.batch_id
+			 WHERE j.status IN ('completed', 'failed', 'cancelled')
+			 ORDER BY j.finished_at DESC
+			 LIMIT ?`
+		)
+		.all(limit) as LogRow[];
+	return rows.map((row) => {
+		const meta = JSON.parse(row.meta) as JobMeta;
+		return {
+			id: row.id,
+			status: row.status,
+			attempts: row.attempts,
+			error: row.error,
+			startedAt: row.started_at,
+			finishedAt: row.finished_at,
+			outputPath: row.output_path,
+			title: meta.title ?? '(unknown)',
+			artist: meta.artist ?? '',
+			batchId: row.batch_id,
+			batchTitle: row.batch_title,
+			batchKind: row.batch_kind,
+			thumbnail: row.batch_thumbnail
+		};
+	});
+}
+
 /** True when every job in the batch has reached a terminal state. */
 export function batchDrained(batchId: string, db: DB = getDb()): boolean {
 	const row = db

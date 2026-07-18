@@ -15,6 +15,11 @@
 			icon: 'M4 6h16M4 12h16M4 18h10M17 15l3 3-3 3'
 		},
 		{
+			href: '/logs',
+			label: 'Logs',
+			icon: 'M9 12h6M9 16h6M9 8h6M6 3h9l5 5v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1zM15 3v5h5'
+		},
+		{
 			href: '/library',
 			label: 'Library',
 			icon: 'M4 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5zM8 3v18M15 10.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z'
