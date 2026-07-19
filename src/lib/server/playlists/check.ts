@@ -43,7 +43,7 @@ export async function checkPlaylistSubscription(
 	deps: PlaylistCheckDeps = defaultDeps
 ): Promise<PlaylistCheckResult> {
 	const playlist = await deps.getPlaylist(sub.browseId);
-	const seen = seenVideoIds(sub.browseId, db);
+	const seen = seenVideoIds(sub.browseId, sub.createdBy, db);
 	const newTracks = playlist.tracks.filter((t) => t.videoId && !seen.has(t.videoId));
 
 	const batchIds: string[] = [];
@@ -61,12 +61,12 @@ export async function checkPlaylistSubscription(
 			tracks,
 			db
 		);
-		markVideosSeen(sub.browseId, newTracks.map((t) => t.videoId) as string[], db);
+		markVideosSeen(sub.browseId, sub.createdBy, newTracks.map((t) => t.videoId) as string[], db);
 		batchIds.push(batch.id);
 		console.log(`playlist sync: enqueued ${newTracks.length} new song(s) from "${playlist.title}"`);
 	}
 
-	markPlaylistChecked(sub.browseId, db);
+	markPlaylistChecked(sub.browseId, sub.createdBy, db);
 	return { enqueued: batchIds.length, batchIds };
 }
 

@@ -4,8 +4,8 @@ import { listQueue } from '$lib/server/queue/store';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = () => {
-	return json({ batches: listQueue() });
+export const GET: RequestHandler = ({ locals }) => {
+	return json({ batches: listQueue(locals.session!.userId) });
 };
 
 export const POST: RequestHandler = async ({ request, locals }) => {

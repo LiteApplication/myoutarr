@@ -4,6 +4,18 @@ export interface JellyfinUser {
 	id: string;
 	name: string;
 	isAdmin: boolean;
+	/** Jellyfin `Policy.EnableCollectionManagement`: allowed to manage collections. */
+	canManageCollections: boolean;
+}
+
+/**
+ * Whether a Jellyfin user may use myoutarr: administrators always may, plus any
+ * user granted collection-management rights (our proxy for "can manage the music
+ * library"). myoutarr writes to the library filesystem itself, so this gate is a
+ * policy choice about who to admit, not a permission it enforces per request.
+ */
+export function canUseMyoutarr(user: { isAdmin: boolean; canManageCollections: boolean }): boolean {
+	return user.isAdmin || user.canManageCollections;
 }
 
 export interface JellyfinAuthResult extends JellyfinUser {
@@ -99,7 +111,11 @@ export class JellyfinClient {
 	async authenticateByName(username: string, password: string): Promise<JellyfinAuthResult> {
 		const result = await this.request<{
 			AccessToken?: string;
-			User?: { Id?: string; Name?: string; Policy?: { IsAdministrator?: boolean } };
+			User?: {
+				Id?: string;
+				Name?: string;
+				Policy?: { IsAdministrator?: boolean; EnableCollectionManagement?: boolean };
+			};
 		}>('POST', '/Users/AuthenticateByName', { body: { Username: username, Pw: password } });
 		if (!result.AccessToken || !result.User?.Id) {
 			throw new JellyfinError('Authentication response missing token or user');
@@ -108,7 +124,8 @@ export class JellyfinClient {
 			accessToken: result.AccessToken,
 			id: result.User.Id,
 			name: result.User.Name ?? username,
-			isAdmin: result.User.Policy?.IsAdministrator ?? false
+			isAdmin: result.User.Policy?.IsAdministrator ?? false,
+			canManageCollections: result.User.Policy?.EnableCollectionManagement ?? false
 		};
 	}
 
@@ -118,12 +135,13 @@ export class JellyfinClient {
 			const user = await this.request<{
 				Id: string;
 				Name?: string;
-				Policy?: { IsAdministrator?: boolean };
+				Policy?: { IsAdministrator?: boolean; EnableCollectionManagement?: boolean };
 			}>('GET', '/Users/Me', { token });
 			return {
 				id: user.Id,
 				name: user.Name ?? '',
-				isAdmin: user.Policy?.IsAdministrator ?? false
+				isAdmin: user.Policy?.IsAdministrator ?? false,
+				canManageCollections: user.Policy?.EnableCollectionManagement ?? false
 			};
 		} catch (error) {
 			if (error instanceof JellyfinError && (error.status === 401 || error.status === 403)) {

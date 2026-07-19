@@ -70,14 +70,14 @@ function playlist(dailyCount = 1) {
 describe('recommendation store', () => {
 	it('creates a playlist, seeds the track pool, and reports it', () => {
 		const pl = playlist();
-		expect(listPlaylists(db)).toHaveLength(1);
+		expect(listPlaylists('user1', db)).toHaveLength(1);
 		expect(trackCount(pl.id, db)).toBe(2);
 		expect(playlistTrackVideoIds(pl.id, db)).toEqual(new Set(['seedA', 'seedB']));
 	});
 
 	it('deletePlaylist cascades the track pool away', () => {
 		const pl = playlist();
-		expect(deletePlaylist(pl.id, db)).toBe(true);
+		expect(deletePlaylist(pl.id, 'user1', db)).toBe(true);
 		expect(getPlaylist(pl.id, db)).toBeNull();
 		expect(playlistTrackVideoIds(pl.id, db).size).toBe(0);
 	});

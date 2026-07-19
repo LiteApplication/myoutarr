@@ -4,9 +4,9 @@ import { getPlaylist } from '$lib/server/ytmusic/api';
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, locals }) => {
 	try {
-		const sub = getPlaylistSubscription(params.id);
+		const sub = getPlaylistSubscription(params.id, locals.session!.userId);
 		const playlist = await getPlaylist(params.id);
 		const tracksWithStatus = playlist.tracks.map((track) => ({
 			...track,

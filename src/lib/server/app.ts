@@ -17,6 +17,7 @@ import {
 	stopSubscriptionScheduler
 } from './subscriptions/scheduler.ts';
 import { stopYtMusic } from './ytmusic/client.ts';
+import { migrateLegacyCookies } from './ytdlp/cookies.ts';
 import { YtdlpPipeline } from './ytdlp/runner.ts';
 
 /**
@@ -33,6 +34,12 @@ export function onBatchDrained(handler: (batchId: string) => void): void {
 export function getPool(): WorkerPool {
 	if (building) throw new Error('worker pool must not start during build');
 	if (!pool) {
+		// Hand any legacy shared cookies file to the first user before serving.
+		try {
+			migrateLegacyCookies();
+		} catch (cause) {
+			console.error('legacy cookie migration failed:', (cause as Error).message);
+		}
 		// Built-in drain reactions: refresh Jellyfin, then materialise playlists.
 		onBatchDrained((batchId) => {
 			scheduleRefresh();

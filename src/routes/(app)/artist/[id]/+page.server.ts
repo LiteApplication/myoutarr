@@ -3,7 +3,7 @@ import { getArtist, getArtistAlbums } from '$lib/server/ytmusic/api';
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, locals }) => {
 	try {
 		const artist = await getArtist(params.id);
 		// When YT Music paginates the discography, fetch the full album list too.
@@ -12,7 +12,7 @@ export const load: PageServerLoad = async ({ params }) => {
 					() => artist.albums
 				)
 			: artist.albums;
-		return { artist, allAlbums, subscribed: isSubscribed(params.id) };
+		return { artist, allAlbums, subscribed: isSubscribed(params.id, locals.session!.userId) };
 	} catch (cause) {
 		error(502, `Could not load artist: ${(cause as Error).message}`);
 	}

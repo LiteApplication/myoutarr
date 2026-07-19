@@ -25,7 +25,8 @@ export const load: PageServerLoad = async ({ params }) => {
 			tracksWithStatus.length > 0 &&
 			tracksWithStatus.every((t) => !t.isAvailable || !t.videoId || t.isDownloaded);
 		// Derive the album directory from the first downloaded track's output path
-		const firstRelPath = tracksWithStatus.find((t) => t.trackRelativePath)?.trackRelativePath ?? null;
+		const firstRelPath =
+			tracksWithStatus.find((t) => t.trackRelativePath)?.trackRelativePath ?? null;
 		const albumRelativeDir = firstRelPath ? path.dirname(firstRelPath) : null;
 		return {
 			album: {

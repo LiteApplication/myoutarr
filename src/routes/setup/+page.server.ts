@@ -1,6 +1,6 @@
 import { createSession, SESSION_COOKIE } from '$lib/server/auth/session';
 import { requireAdmin } from '$lib/server/env';
-import { JellyfinClient, JellyfinError } from '$lib/server/jellyfin/client';
+import { canUseMyoutarr, JellyfinClient, JellyfinError } from '$lib/server/jellyfin/client';
 import { createSentinel } from '$lib/server/library/publish';
 import { getSettings, updateSettings } from '$lib/server/settings';
 import { fail, redirect } from '@sveltejs/kit';
@@ -65,6 +65,13 @@ export const actions: Actions = {
 					step: 'connect',
 					url,
 					error: 'Setup requires a Jellyfin administrator account.'
+				});
+			}
+			if (!requireAdmin() && !canUseMyoutarr(auth)) {
+				return fail(403, {
+					step: 'connect',
+					url,
+					error: 'Your Jellyfin account needs collection-management rights to use this.'
 				});
 			}
 			updateSettings({ jellyfinUrl: url });

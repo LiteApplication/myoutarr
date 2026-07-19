@@ -73,9 +73,9 @@ function sub() {
 describe('subscription store', () => {
 	it('subscribes, seeds the seen-set, and reports membership', () => {
 		sub();
-		expect(isSubscribed(ARTIST, db)).toBe(true);
-		expect(listSubscriptions(db)).toHaveLength(1);
-		expect(seenReleaseIds(ARTIST, db)).toEqual(new Set(['MPRE_a', 'MPRE_b']));
+		expect(isSubscribed(ARTIST, 'user1', db)).toBe(true);
+		expect(listSubscriptions('user1', db)).toHaveLength(1);
+		expect(seenReleaseIds(ARTIST, 'user1', db)).toEqual(new Set(['MPRE_a', 'MPRE_b']));
 	});
 
 	it('re-subscribing tops up the seen-set without duplicating', () => {
@@ -85,21 +85,44 @@ describe('subscription store', () => {
 			['MPRE_b', 'MPRE_c'],
 			db
 		);
-		expect(listSubscriptions(db)).toHaveLength(1);
-		expect(listSubscriptions(db)[0].name).toBe('Renamed');
-		expect(seenReleaseIds(ARTIST, db)).toEqual(new Set(['MPRE_a', 'MPRE_b', 'MPRE_c']));
+		expect(listSubscriptions('user1', db)).toHaveLength(1);
+		expect(listSubscriptions('user1', db)[0].name).toBe('Renamed');
+		expect(seenReleaseIds(ARTIST, 'user1', db)).toEqual(new Set(['MPRE_a', 'MPRE_b', 'MPRE_c']));
 	});
 
 	it('unsubscribe cascades the seen-set away', () => {
 		sub();
-		expect(unsubscribe(ARTIST, db)).toBe(true);
-		expect(isSubscribed(ARTIST, db)).toBe(false);
-		expect(seenReleaseIds(ARTIST, db).size).toBe(0);
+		expect(unsubscribe(ARTIST, 'user1', db)).toBe(true);
+		expect(isSubscribed(ARTIST, 'user1', db)).toBe(false);
+		expect(seenReleaseIds(ARTIST, 'user1', db).size).toBe(0);
 	});
 
 	it('due list respects the interval and last-checked time', () => {
 		sub(); // last_checked_at is null → always due
 		expect(dueSubscriptions(24 * 3600_000, db)).toHaveLength(1);
+	});
+
+	it('keeps two users following the same artist independent', () => {
+		subscribe(
+			{ browseId: ARTIST, name: 'Test Artist', thumbnail: null, createdBy: 'user1' },
+			['MPRE_a'],
+			db
+		);
+		subscribe(
+			{ browseId: ARTIST, name: 'Test Artist', thumbnail: null, createdBy: 'user2' },
+			['MPRE_z'],
+			db
+		);
+		// Each user sees only their own subscription with their own seen-set.
+		expect(listSubscriptions('user1', db)).toHaveLength(1);
+		expect(listSubscriptions('user2', db)).toHaveLength(1);
+		expect(seenReleaseIds(ARTIST, 'user1', db)).toEqual(new Set(['MPRE_a']));
+		expect(seenReleaseIds(ARTIST, 'user2', db)).toEqual(new Set(['MPRE_z']));
+		// One unsubscribing leaves the other intact.
+		unsubscribe(ARTIST, 'user1', db);
+		expect(isSubscribed(ARTIST, 'user1', db)).toBe(false);
+		expect(isSubscribed(ARTIST, 'user2', db)).toBe(true);
+		expect(seenReleaseIds(ARTIST, 'user2', db)).toEqual(new Set(['MPRE_z']));
 	});
 });
 
@@ -107,22 +130,22 @@ describe('checkSubscription', () => {
 	it('enqueues only releases not already seen, then marks them seen', async () => {
 		sub(); // seen: MPRE_a, MPRE_b
 		const { deps: d, enqueued } = deps(['MPRE_a', 'MPRE_b', 'MPRE_new']);
-		const result = await checkSubscription(listSubscriptions(db)[0], db, d);
+		const result = await checkSubscription(listSubscriptions('user1', db)[0], db, d);
 
 		expect(enqueued).toEqual(['MPRE_new']);
 		expect(result.enqueued).toBe(1);
-		expect(seenReleaseIds(ARTIST, db).has('MPRE_new')).toBe(true);
+		expect(seenReleaseIds(ARTIST, 'user1', db).has('MPRE_new')).toBe(true);
 		// last_checked_at is now set.
-		expect(listSubscriptions(db)[0].lastCheckedAt).not.toBeNull();
+		expect(listSubscriptions('user1', db)[0].lastCheckedAt).not.toBeNull();
 	});
 
 	it('is a no-op on the second run when nothing new appeared', async () => {
 		sub();
 		const first = deps(['MPRE_a', 'MPRE_b', 'MPRE_new']);
-		await checkSubscription(listSubscriptions(db)[0], db, first.deps);
+		await checkSubscription(listSubscriptions('user1', db)[0], db, first.deps);
 
 		const second = deps(['MPRE_a', 'MPRE_b', 'MPRE_new']);
-		const result = await checkSubscription(listSubscriptions(db)[0], db, second.deps);
+		const result = await checkSubscription(listSubscriptions('user1', db)[0], db, second.deps);
 		expect(second.enqueued).toEqual([]);
 		expect(result.enqueued).toBe(0);
 	});
@@ -137,9 +160,9 @@ describe('checkSubscription', () => {
 		};
 		// Point getReleases at a new release that will fail to enqueue.
 		failing.getReleases = deps(['MPRE_a', 'MPRE_b', 'MPRE_flaky']).deps.getReleases;
-		const result = await checkSubscription(listSubscriptions(db)[0], db, failing);
+		const result = await checkSubscription(listSubscriptions('user1', db)[0], db, failing);
 		expect(result.enqueued).toBe(0);
-		expect(seenReleaseIds(ARTIST, db).has('MPRE_flaky')).toBe(false);
+		expect(seenReleaseIds(ARTIST, 'user1', db).has('MPRE_flaky')).toBe(false);
 	});
 });
 

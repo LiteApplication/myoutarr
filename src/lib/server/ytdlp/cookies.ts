@@ -1,13 +1,16 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import type { DB } from '../db/index.ts';
+import { getDb } from '../db/index.ts';
 import { configDir } from '../env.ts';
 
 /**
  * Per-account yt-dlp cookies. Each Jellyfin user supplies their own
  * Netscape-format cookies.txt (exported from a browser signed in to YouTube),
- * stored at `$CONFIG_DIR/cookies/<userId>.txt`. A legacy shared file at
- * `$CONFIG_DIR/cookies.txt` is still honoured as a fallback so existing
- * single-cookie deployments keep working.
+ * stored at `$CONFIG_DIR/cookies/<userId>.txt`. Cookies are private to each
+ * account: a user without their own file simply has none. A legacy shared file
+ * at `$CONFIG_DIR/cookies.txt` (from single-user deployments) is migrated to the
+ * first user's own file on boot - see `migrateLegacyCookies`.
  */
 
 /** Directory holding one cookies file per account. */
@@ -36,18 +39,39 @@ function legacyCookiesPath(root: string = configDir()): string {
 
 /**
  * The cookies file yt-dlp should use for this account, or `undefined` when the
- * account has none and no legacy shared file exists.
+ * account has none. Cookies are not shared between users, so there is no
+ * cross-account fallback: the legacy shared file is migrated to a single owner
+ * on boot (see `migrateLegacyCookies`) rather than borrowed by everyone.
  */
 export function resolveCookiesFile(
 	userId: string | null,
 	root: string = configDir()
 ): string | undefined {
-	if (userId) {
-		const own = cookiesPath(userId, root);
-		if (existsSync(own)) return own;
-	}
+	if (!userId) return undefined;
+	const own = cookiesPath(userId, root);
+	return existsSync(own) ? own : undefined;
+}
+
+/**
+ * One-time migration for deployments that used the single shared cookies file:
+ * hand it to the first user that ever signed in (earliest session) so their
+ * downloads keep working, then remove the shared file so it can't leak to other
+ * accounts. No-op when there is no legacy file, no users yet, or that user
+ * already has their own cookies.
+ */
+export function migrateLegacyCookies(db: DB = getDb(), root: string = configDir()): void {
 	const legacy = legacyCookiesPath(root);
-	return existsSync(legacy) ? legacy : undefined;
+	if (!existsSync(legacy)) return;
+	const row = db.prepare('SELECT user_id FROM sessions ORDER BY created_at ASC LIMIT 1').get() as
+		{ user_id: string } | undefined;
+	if (!row) return; // no user to assign it to yet; try again next boot
+	const dest = cookiesPath(row.user_id, root);
+	if (existsSync(dest)) {
+		rmSync(legacy, { force: true }); // owner already has their own cookies
+		return;
+	}
+	mkdirSync(cookiesDir(root), { recursive: true });
+	renameSync(legacy, dest);
 }
 
 /** Whether this account has its own cookies file. */

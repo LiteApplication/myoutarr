@@ -1,12 +1,14 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { openDatabase, type DB } from '../db/index.ts';
 import {
 	cookiesPath,
 	deleteCookies,
 	hasCookies,
 	looksLikeCookiesFile,
+	migrateLegacyCookies,
 	readCookies,
 	resolveCookiesFile,
 	saveCookies
@@ -36,15 +38,14 @@ describe('per-account cookies', () => {
 		expect(resolveCookiesFile('bob', root)).toBeUndefined();
 	});
 
-	it('falls back to the legacy shared cookies.txt', () => {
+	it('does not share the legacy cookies.txt across accounts', () => {
+		// The legacy shared file is not a cross-account fallback: an account
+		// without its own file gets nothing until the file is migrated to it.
 		writeFileSync(path.join(root, 'cookies.txt'), NETSCAPE);
-		expect(resolveCookiesFile('nobody', root)).toBe(path.join(root, 'cookies.txt'));
-		// An account's own file wins over the legacy one.
-		saveCookies('nobody', NETSCAPE, root);
-		expect(resolveCookiesFile('nobody', root)).toBe(cookiesPath('nobody', root));
+		expect(resolveCookiesFile('nobody', root)).toBeUndefined();
 	});
 
-	it('returns undefined when there is no owner and no legacy file', () => {
+	it('returns undefined when there is no owner', () => {
 		expect(resolveCookiesFile(null, root)).toBeUndefined();
 	});
 
@@ -67,5 +68,52 @@ describe('per-account cookies', () => {
 		expect(looksLikeCookiesFile('.youtube.com\tTRUE\t/\tTRUE\t99\tSID\tabc')).toBe(true);
 		expect(looksLikeCookiesFile('<html>not cookies</html>')).toBe(false);
 		expect(looksLikeCookiesFile('')).toBe(false);
+	});
+});
+
+describe('legacy cookie migration', () => {
+	let root: string;
+	let db: DB;
+
+	beforeEach(() => {
+		root = mkdtempSync(path.join(tmpdir(), 'cookies-mig-'));
+		db = openDatabase(path.join(root, 'test.db'));
+	});
+	afterEach(() => {
+		db.close();
+		rmSync(root, { recursive: true, force: true });
+	});
+
+	function addSession(userId: string, createdAt: number): void {
+		db.prepare(
+			`INSERT INTO sessions (id, jellyfin_token, user_id, user_name, is_admin, created_at, expires_at)
+			 VALUES (?, ?, ?, ?, 0, ?, ?)`
+		).run(`s-${userId}`, 'tok', userId, userId, createdAt, createdAt + 1_000_000);
+	}
+
+	it('hands the legacy file to the earliest user and removes it', () => {
+		writeFileSync(path.join(root, 'cookies.txt'), NETSCAPE);
+		addSession('second', 2000);
+		addSession('first', 1000);
+		migrateLegacyCookies(db, root);
+		expect(existsSync(path.join(root, 'cookies.txt'))).toBe(false);
+		expect(readCookies('first', root)).toBe(NETSCAPE);
+		expect(hasCookies('second', root)).toBe(false);
+		expect(resolveCookiesFile('first', root)).toBe(cookiesPath('first', root));
+	});
+
+	it('is a no-op when there are no users yet', () => {
+		writeFileSync(path.join(root, 'cookies.txt'), NETSCAPE);
+		migrateLegacyCookies(db, root);
+		expect(existsSync(path.join(root, 'cookies.txt'))).toBe(true);
+	});
+
+	it('drops the legacy file when the owner already has their own', () => {
+		writeFileSync(path.join(root, 'cookies.txt'), NETSCAPE);
+		addSession('first', 1000);
+		saveCookies('first', 'OWN\n', root);
+		migrateLegacyCookies(db, root);
+		expect(existsSync(path.join(root, 'cookies.txt'))).toBe(false);
+		expect(readCookies('first', root)).toBe('OWN\n'); // own file untouched
 	});
 });

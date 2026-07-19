@@ -66,9 +66,14 @@ export function createPlaylist(
 	return getPlaylist(id, db) as RecommendationPlaylist;
 }
 
-export function deletePlaylist(id: string, db: DB = getDb()): boolean {
+/** Delete a recommendation playlist, but only if it belongs to the given user. */
+export function deletePlaylist(id: string, createdBy: string, db: DB = getDb()): boolean {
 	// recommendation_tracks rows cascade via the foreign key.
-	return db.prepare('DELETE FROM recommendation_playlists WHERE id = ?').run(id).changes > 0;
+	return (
+		db
+			.prepare('DELETE FROM recommendation_playlists WHERE id = ? AND created_by = ?')
+			.run(id, createdBy).changes > 0
+	);
 }
 
 export function getPlaylist(id: string, db: DB = getDb()): RecommendationPlaylist | null {
@@ -77,10 +82,13 @@ export function getPlaylist(id: string, db: DB = getDb()): RecommendationPlaylis
 	return row ? rowToPlaylist(row) : null;
 }
 
-export function listPlaylists(db: DB = getDb()): RecommendationPlaylist[] {
+/** One user's recommendation playlists. */
+export function listPlaylists(createdBy: string, db: DB = getDb()): RecommendationPlaylist[] {
 	const rows = db
-		.prepare('SELECT * FROM recommendation_playlists ORDER BY name COLLATE NOCASE')
-		.all() as RecommendationPlaylistRow[];
+		.prepare(
+			'SELECT * FROM recommendation_playlists WHERE created_by = ? ORDER BY name COLLATE NOCASE'
+		)
+		.all(createdBy) as RecommendationPlaylistRow[];
 	return rows.map(rowToPlaylist);
 }
 

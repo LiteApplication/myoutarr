@@ -237,46 +237,61 @@ export function failJob(
 	return 'failed';
 }
 
-/** Cancel every unfinished job in a batch (running jobs are aborted by the pool). */
-export function cancelBatch(batchId: string, db: DB = getDb()): string[] {
+/**
+ * Cancel every unfinished job in a batch (running jobs are aborted by the pool).
+ * Scoped to the owning user: a batch belonging to someone else is left untouched
+ * and yields no cancelled ids.
+ */
+export function cancelBatch(batchId: string, userId: string, db: DB = getDb()): string[] {
 	const rows = db
 		.prepare(
 			`UPDATE jobs SET status = 'cancelled', finished_at = ?
 			 WHERE batch_id = ? AND status IN ('queued', 'paused', 'running')
+			 AND batch_id IN (SELECT id FROM batches WHERE id = ? AND created_by = ?)
 			 RETURNING id, status`
 		)
-		.all(Date.now(), batchId) as { id: string }[];
+		.all(Date.now(), batchId, batchId, userId) as { id: string }[];
 	return rows.map((r) => r.id);
 }
 
-export function cancelJob(id: string, db: DB = getDb()): boolean {
+export function cancelJob(id: string, userId: string, db: DB = getDb()): boolean {
 	return (
 		db
 			.prepare(
 				`UPDATE jobs SET status = 'cancelled', finished_at = ?
-			 WHERE id = ? AND status IN ('queued', 'paused', 'running')`
+			 WHERE id = ? AND status IN ('queued', 'paused', 'running')
+			 AND batch_id IN (SELECT id FROM batches WHERE created_by = ?)`
 			)
-			.run(Date.now(), id).changes > 0
+			.run(Date.now(), id, userId).changes > 0
 	);
 }
 
-export function retryJob(id: string, db: DB = getDb()): boolean {
+export function retryJob(id: string, userId: string, db: DB = getDb()): boolean {
 	return (
 		db
 			.prepare(
 				`UPDATE jobs SET status = 'queued', error = NULL, next_retry_at = NULL, attempts = 0, progress = 0
-			 WHERE id = ? AND status IN ('failed', 'cancelled')`
+			 WHERE id = ? AND status IN ('failed', 'cancelled')
+			 AND batch_id IN (SELECT id FROM batches WHERE created_by = ?)`
 			)
-			.run(id).changes > 0
+			.run(id, userId).changes > 0
 	);
 }
 
-export function pauseQueue(db: DB = getDb()): void {
-	db.prepare("UPDATE jobs SET status = 'paused' WHERE status = 'queued'").run();
+/** Pause only the calling user's queued jobs. */
+export function pauseQueue(userId: string, db: DB = getDb()): void {
+	db.prepare(
+		`UPDATE jobs SET status = 'paused' WHERE status = 'queued'
+		 AND batch_id IN (SELECT id FROM batches WHERE created_by = ?)`
+	).run(userId);
 }
 
-export function resumeQueue(db: DB = getDb()): void {
-	db.prepare("UPDATE jobs SET status = 'queued' WHERE status = 'paused'").run();
+/** Resume only the calling user's paused jobs. */
+export function resumeQueue(userId: string, db: DB = getDb()): void {
+	db.prepare(
+		`UPDATE jobs SET status = 'queued' WHERE status = 'paused'
+		 AND batch_id IN (SELECT id FROM batches WHERE created_by = ?)`
+	).run(userId);
 }
 
 /** Boot recovery: jobs left 'running' by a dead process go back to the queue. */
@@ -330,10 +345,11 @@ export interface BatchWithJobs extends Batch {
 	jobs: Job[];
 }
 
-export function listQueue(db: DB = getDb(), limit = 50): BatchWithJobs[] {
+/** The queue as one user sees it: only their own batches. */
+export function listQueue(userId: string, db: DB = getDb(), limit = 50): BatchWithJobs[] {
 	const batches = db
-		.prepare('SELECT * FROM batches ORDER BY created_at DESC LIMIT ?')
-		.all(limit) as {
+		.prepare('SELECT * FROM batches WHERE created_by = ? ORDER BY created_at DESC LIMIT ?')
+		.all(userId, limit) as {
 		id: string;
 		kind: BatchKind;
 		source_id: string;
@@ -401,7 +417,8 @@ interface LogRow {
  * finished first. Backs the Logs view - reads straight from the job table, no
  * separate log store needed.
  */
-export function listRecentJobs(db: DB = getDb(), limit = 200): LogEntry[] {
+/** One user's recent download history (their batches only). */
+export function listRecentJobs(userId: string, db: DB = getDb(), limit = 200): LogEntry[] {
 	const rows = db
 		.prepare(
 			`SELECT j.id, j.video_id, j.status, j.attempts, j.error, j.started_at, j.finished_at,
@@ -409,11 +426,11 @@ export function listRecentJobs(db: DB = getDb(), limit = 200): LogEntry[] {
 			        b.title AS batch_title, b.kind AS batch_kind, b.thumbnail AS batch_thumbnail,
 			        b.source_id AS batch_source_id
 			 FROM jobs j JOIN batches b ON b.id = j.batch_id
-			 WHERE j.status IN ('completed', 'failed', 'cancelled')
+			 WHERE j.status IN ('completed', 'failed', 'cancelled') AND b.created_by = ?
 			 ORDER BY j.finished_at DESC
 			 LIMIT ?`
 		)
-		.all(limit) as LogRow[];
+		.all(userId, limit) as LogRow[];
 	return rows.map((row) => {
 		const meta = JSON.parse(row.meta) as JobMeta;
 		return {

@@ -4,27 +4,40 @@ import { listSubscriptions } from '$lib/server/subscriptions/store';
 import { listPlaylistSubscriptions } from '$lib/server/playlists/store';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = () => {
+export const load: PageServerLoad = ({ locals }) => {
 	const db = getDb();
+	const userId = locals.session!.userId;
 
-	// Library statistics
-	const completedCount = (
-		db.prepare("SELECT COUNT(*) AS c FROM jobs WHERE status = 'completed'").get() as { c: number }
-	).c;
-	const failedCount = (
-		db.prepare("SELECT COUNT(*) AS c FROM jobs WHERE status = 'failed'").get() as { c: number }
-	).c;
+	// Library statistics - scoped to the signed-in user's own downloads.
+	const jobCount = (status: string) =>
+		(
+			db
+				.prepare(
+					`SELECT COUNT(*) AS c FROM jobs j JOIN batches b ON b.id = j.batch_id
+					 WHERE j.status = ? AND b.created_by = ?`
+				)
+				.get(status, userId) as { c: number }
+		).c;
+	const completedCount = jobCount('completed');
+	const failedCount = jobCount('failed');
 	const queuedCount = (
-		db.prepare("SELECT COUNT(*) AS c FROM jobs WHERE status IN ('queued', 'running')").get() as {
-			c: number;
-		}
+		db
+			.prepare(
+				`SELECT COUNT(*) AS c FROM jobs j JOIN batches b ON b.id = j.batch_id
+				 WHERE j.status IN ('queued', 'running') AND b.created_by = ?`
+			)
+			.get(userId) as { c: number }
 	).c;
 
 	const artistSubCount = (
-		db.prepare('SELECT COUNT(*) AS c FROM artist_subscriptions').get() as { c: number }
+		db
+			.prepare('SELECT COUNT(*) AS c FROM artist_subscriptions WHERE created_by = ?')
+			.get(userId) as { c: number }
 	).c;
 	const playlistSubCount = (
-		db.prepare('SELECT COUNT(*) AS c FROM playlist_subscriptions').get() as { c: number }
+		db
+			.prepare('SELECT COUNT(*) AS c FROM playlist_subscriptions WHERE created_by = ?')
+			.get(userId) as { c: number }
 	).c;
 
 	const stats = {
@@ -35,11 +48,11 @@ export const load: PageServerLoad = () => {
 	};
 
 	// Get 5 recent downloads
-	const recentDownloads = listRecentJobs(db, 5);
+	const recentDownloads = listRecentJobs(userId, db, 5);
 
 	// Get sub lists to display on home page
-	const artistSubs = listSubscriptions(db).slice(0, 4);
-	const playlistSubs = listPlaylistSubscriptions(db).slice(0, 4);
+	const artistSubs = listSubscriptions(userId, db).slice(0, 4);
+	const playlistSubs = listPlaylistSubscriptions(userId, db).slice(0, 4);
 
 	return {
 		stats,

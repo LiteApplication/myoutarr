@@ -146,7 +146,7 @@ describe('queue store', () => {
 			verdict = failJob(job.id, 'still broken', { maxRetries: 2, retryable: true }, db);
 		}
 		expect(verdict).toBe('failed');
-		const queue = listQueue(db);
+		const queue = listQueue('u1', db);
 		expect(queue[0].jobs[0].status).toBe('failed');
 		expect(queue[0].jobs[0].error).toBe('still broken');
 	});
@@ -171,29 +171,29 @@ describe('queue store', () => {
 	it('cancels a whole batch and can retry a cancelled job', () => {
 		const { batch } = makeBatch(3);
 		claimNextJob(db);
-		const cancelled = cancelBatch(batch.id, db);
+		const cancelled = cancelBatch(batch.id, 'u1', db);
 		expect(cancelled).toHaveLength(3);
 		expect(batchDrained(batch.id, db)).toBe(true);
-		const jobId = listQueue(db)[0].jobs[0].id;
-		expect(retryJob(jobId, db)).toBe(true);
+		const jobId = listQueue('u1', db)[0].jobs[0].id;
+		expect(retryJob(jobId, 'u1', db)).toBe(true);
 		expect(batchDrained(batch.id, db)).toBe(false);
 	});
 
 	it('pause/resume flips queued jobs only', () => {
 		makeBatch(2);
 		const running = claimNextJob(db)!;
-		pauseQueue(db);
+		pauseQueue('u1', db);
 		expect(claimNextJob(db)).toBeNull();
-		resumeQueue(db);
+		resumeQueue('u1', db);
 		expect(claimNextJob(db)).not.toBeNull();
-		expect(cancelJob(running.id, db)).toBe(true);
+		expect(cancelJob(running.id, 'u1', db)).toBe(true);
 	});
 
 	it('completes a job with its output path', () => {
 		makeBatch(1);
 		const job = claimNextJob(db)!;
 		completeJob(job.id, '/music/A/B/01 - Track 0.opus', db);
-		const stored = listQueue(db)[0].jobs[0];
+		const stored = listQueue('u1', db)[0].jobs[0];
 		expect(stored.status).toBe('completed');
 		expect(stored.progress).toBe(1);
 		expect(stored.outputPath).toBe('/music/A/B/01 - Track 0.opus');
@@ -210,7 +210,7 @@ describe('queue store', () => {
 		failJob(b.id, 'boom', { maxRetries: 0, retryable: false }, db);
 		// third job stays queued and must not appear in the log
 
-		const log = listRecentJobs(db);
+		const log = listRecentJobs('u1', db);
 		expect(log).toHaveLength(2);
 		expect(log.every((e) => e.status !== 'queued')).toBe(true);
 		// finished_at DESC → the failure (finished last) comes first
@@ -258,7 +258,7 @@ describe('worker pool', () => {
 		pool.start();
 		await drain(pool, batch.id);
 		expect(peak).toBeLessThanOrEqual(2);
-		const jobs = listQueue(db)[0].jobs;
+		const jobs = listQueue('u1', db)[0].jobs;
 		expect(jobs.every((j) => j.status === 'completed')).toBe(true);
 		await pool.stop();
 	});
@@ -283,7 +283,7 @@ describe('worker pool', () => {
 				if (batchDrained(batch.id, db)) break;
 			}
 			expect(calls).toBe(3);
-			expect(listQueue(db)[0].jobs[0].status).toBe('completed');
+			expect(listQueue('u1', db)[0].jobs[0].status).toBe('completed');
 			await pool.stop();
 		} finally {
 			vi.useRealTimers();
@@ -300,7 +300,7 @@ describe('worker pool', () => {
 		);
 		pool.start();
 		await drain(pool, batch.id);
-		const job = listQueue(db)[0].jobs[0];
+		const job = listQueue('u1', db)[0].jobs[0];
 		expect(job.status).toBe('failed');
 		expect(job.error).toBe('video unavailable');
 		await pool.stop();
@@ -319,10 +319,10 @@ describe('worker pool', () => {
 		);
 		pool.start();
 		await new Promise((r) => setTimeout(r, 50)); // let it claim and start
-		cancelJob(jobs[0].id, db);
+		cancelJob(jobs[0].id, 'u1', db);
 		pool.abortJob(jobs[0].id);
 		await drain(pool, batch.id);
-		expect(listQueue(db)[0].jobs[0].status).toBe('cancelled');
+		expect(listQueue('u1', db)[0].jobs[0].status).toBe('cancelled');
 		await pool.stop();
 	});
 

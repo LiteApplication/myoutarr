@@ -6,8 +6,8 @@ import type { RequestHandler } from './$types';
 /** YT Music artist channel ids look like `UC…`; validate before hitting the worker. */
 const ARTIST_ID = /^UC[A-Za-z0-9_-]{10,}$/;
 
-export const GET: RequestHandler = () => {
-	return json({ subscriptions: listSubscriptions() });
+export const GET: RequestHandler = ({ locals }) => {
+	return json({ subscriptions: listSubscriptions(locals.session!.userId) });
 };
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -40,7 +40,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 };
 
-export const DELETE: RequestHandler = async ({ request }) => {
+export const DELETE: RequestHandler = async ({ request, locals }) => {
 	let body: { browseId?: unknown };
 	try {
 		body = (await request.json()) as { browseId?: unknown };
@@ -49,6 +49,6 @@ export const DELETE: RequestHandler = async ({ request }) => {
 	}
 	const browseId = typeof body.browseId === 'string' ? body.browseId : '';
 	if (!browseId) return json({ error: 'browseId is required' }, { status: 400 });
-	const removed = unsubscribe(browseId);
+	const removed = unsubscribe(browseId, locals.session!.userId);
 	return json({ removed });
 };

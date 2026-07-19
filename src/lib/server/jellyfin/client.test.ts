@@ -37,13 +37,23 @@ describe('JellyfinClient', () => {
 	it('parses a successful authentication', async () => {
 		const fetchImpl = mockFetch(200, {
 			AccessToken: 'tok',
-			User: { Id: 'u1', Name: 'alexis', Policy: { IsAdministrator: true } }
+			User: {
+				Id: 'u1',
+				Name: 'alexis',
+				Policy: { IsAdministrator: true, EnableCollectionManagement: false }
+			}
 		});
 		const result = await new JellyfinClient('http://jf:8096', fetchImpl).authenticateByName(
 			'alexis',
 			'pw'
 		);
-		expect(result).toEqual({ accessToken: 'tok', id: 'u1', name: 'alexis', isAdmin: true });
+		expect(result).toEqual({
+			accessToken: 'tok',
+			id: 'u1',
+			name: 'alexis',
+			isAdmin: true,
+			canManageCollections: false
+		});
 	});
 
 	it('surfaces 401 as a JellyfinError with status', async () => {

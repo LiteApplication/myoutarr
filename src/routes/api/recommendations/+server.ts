@@ -54,8 +54,11 @@ function seedToSong(seed: SeedInput): SongResult {
 	};
 }
 
-export const GET: RequestHandler = () => {
-	const playlists = listPlaylists().map((pl) => ({ ...pl, trackCount: trackCount(pl.id) }));
+export const GET: RequestHandler = ({ locals }) => {
+	const playlists = listPlaylists(locals.session!.userId).map((pl) => ({
+		...pl,
+		trackCount: trackCount(pl.id)
+	}));
 	return json({ playlists });
 };
 
@@ -101,7 +104,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	return json({ playlist }, { status: 201 });
 };
 
-export const DELETE: RequestHandler = async ({ request }) => {
+export const DELETE: RequestHandler = async ({ request, locals }) => {
 	let body: { id?: unknown };
 	try {
 		body = (await request.json()) as { id?: unknown };
@@ -110,6 +113,6 @@ export const DELETE: RequestHandler = async ({ request }) => {
 	}
 	const id = typeof body.id === 'string' ? body.id : '';
 	if (!id) return json({ error: 'id is required' }, { status: 400 });
-	const removed = deletePlaylist(id);
+	const removed = deletePlaylist(id, locals.session!.userId);
 	return json({ removed });
 };

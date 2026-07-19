@@ -118,13 +118,13 @@ describe('full pipeline', () => {
 		const pool = new WorkerPool(pipeline(), { db, concurrency: () => 2, maxRetries: () => 0 });
 		pool.start();
 		const start = Date.now();
-		while (listQueue(db)[0].jobs.some((j) => !['completed', 'failed'].includes(j.status))) {
+		while (listQueue('u', db)[0].jobs.some((j) => !['completed', 'failed'].includes(j.status))) {
 			if (Date.now() - start > 30_000) throw new Error('pipeline timeout');
 			await new Promise((r) => setTimeout(r, 50));
 		}
 		await pool.stop();
 
-		const jobs = listQueue(db)[0].jobs;
+		const jobs = listQueue('u', db)[0].jobs;
 		expect(jobs.map((j) => j.status)).toEqual(['completed', 'completed']);
 
 		const albumDir = path.join(library, 'Daft Punk', 'Discovery (2001)');

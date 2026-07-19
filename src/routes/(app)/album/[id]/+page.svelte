@@ -158,11 +158,27 @@
 							aria-label="Delete {track.title}"
 						>
 							<!-- Default: checkmark -->
-							<svg viewBox="0 0 24 24" class="h-4 w-4 group-hover/del:hidden" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+							<svg
+								viewBox="0 0 24 24"
+								class="h-4 w-4 group-hover/del:hidden"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
 								<path d="M20 6 9 17l-5-5" />
 							</svg>
 							<!-- Hover: trash icon -->
-							<svg viewBox="0 0 24 24" class="h-4 w-4 hidden group-hover/del:block" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<svg
+								viewBox="0 0 24 24"
+								class="h-4 w-4 hidden group-hover/del:block"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
 								<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
 							</svg>
 						</button>

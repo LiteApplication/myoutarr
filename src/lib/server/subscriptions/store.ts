@@ -46,46 +46,61 @@ export function subscribe(
 	const upsertSub = db.prepare(
 		`INSERT INTO artist_subscriptions (browse_id, name, thumbnail, created_by, created_at)
 		 VALUES (?, ?, ?, ?, ?)
-		 ON CONFLICT (browse_id) DO UPDATE SET name = excluded.name, thumbnail = excluded.thumbnail`
+		 ON CONFLICT (browse_id, created_by) DO UPDATE SET name = excluded.name, thumbnail = excluded.thumbnail`
 	);
 	const upsertSeen = db.prepare(
-		`INSERT INTO subscription_seen (browse_id, release_id, seen_at) VALUES (?, ?, ?)
-		 ON CONFLICT (browse_id, release_id) DO NOTHING`
+		`INSERT INTO subscription_seen (browse_id, created_by, release_id, seen_at) VALUES (?, ?, ?, ?)
+		 ON CONFLICT (browse_id, created_by, release_id) DO NOTHING`
 	);
 	db.transaction(() => {
 		upsertSub.run(input.browseId, input.name, input.thumbnail, input.createdBy, now);
-		for (const releaseId of seedReleaseIds) upsertSeen.run(input.browseId, releaseId, now);
+		for (const releaseId of seedReleaseIds)
+			upsertSeen.run(input.browseId, input.createdBy, releaseId, now);
 	})();
-	return getSubscription(input.browseId, db) as Subscription;
+	return getSubscription(input.browseId, input.createdBy, db) as Subscription;
 }
 
-export function unsubscribe(browseId: string, db: DB = getDb()): boolean {
+export function unsubscribe(browseId: string, createdBy: string, db: DB = getDb()): boolean {
 	// subscription_seen rows cascade via the foreign key.
 	return (
-		db.prepare('DELETE FROM artist_subscriptions WHERE browse_id = ?').run(browseId).changes > 0
+		db
+			.prepare('DELETE FROM artist_subscriptions WHERE browse_id = ? AND created_by = ?')
+			.run(browseId, createdBy).changes > 0
 	);
 }
 
-export function getSubscription(browseId: string, db: DB = getDb()): Subscription | null {
-	const row = db.prepare('SELECT * FROM artist_subscriptions WHERE browse_id = ?').get(browseId) as
-		SubscriptionRow | undefined;
+export function getSubscription(
+	browseId: string,
+	createdBy: string,
+	db: DB = getDb()
+): Subscription | null {
+	const row = db
+		.prepare('SELECT * FROM artist_subscriptions WHERE browse_id = ? AND created_by = ?')
+		.get(browseId, createdBy) as SubscriptionRow | undefined;
 	return row ? rowToSubscription(row) : null;
 }
 
-export function isSubscribed(browseId: string, db: DB = getDb()): boolean {
+export function isSubscribed(browseId: string, createdBy: string, db: DB = getDb()): boolean {
 	return (
-		db.prepare('SELECT 1 FROM artist_subscriptions WHERE browse_id = ?').get(browseId) !== undefined
+		db
+			.prepare('SELECT 1 FROM artist_subscriptions WHERE browse_id = ? AND created_by = ?')
+			.get(browseId, createdBy) !== undefined
 	);
 }
 
-export function listSubscriptions(db: DB = getDb()): Subscription[] {
+/** One user's artist subscriptions. */
+export function listSubscriptions(createdBy: string, db: DB = getDb()): Subscription[] {
 	const rows = db
-		.prepare('SELECT * FROM artist_subscriptions ORDER BY name COLLATE NOCASE')
-		.all() as SubscriptionRow[];
+		.prepare('SELECT * FROM artist_subscriptions WHERE created_by = ? ORDER BY name COLLATE NOCASE')
+		.all(createdBy) as SubscriptionRow[];
 	return rows.map(rowToSubscription);
 }
 
-/** Subscriptions whose last check is older than `intervalMs` (or never checked). */
+/**
+ * Subscriptions (across all users) whose last check is older than `intervalMs`
+ * (or never checked). Background checks run for everyone; each row carries the
+ * owning user in `createdBy` for per-owner attribution.
+ */
 export function dueSubscriptions(
 	intervalMs: number,
 	db: DB = getDb(),
@@ -102,28 +117,33 @@ export function dueSubscriptions(
 }
 
 /** Which of the given release ids the subscription has already accounted for. */
-export function seenReleaseIds(browseId: string, db: DB = getDb()): Set<string> {
+export function seenReleaseIds(browseId: string, createdBy: string, db: DB = getDb()): Set<string> {
 	const rows = db
-		.prepare('SELECT release_id FROM subscription_seen WHERE browse_id = ?')
-		.all(browseId) as { release_id: string }[];
+		.prepare('SELECT release_id FROM subscription_seen WHERE browse_id = ? AND created_by = ?')
+		.all(browseId, createdBy) as { release_id: string }[];
 	return new Set(rows.map((r) => r.release_id));
 }
 
 export function markReleaseSeen(
 	browseId: string,
+	createdBy: string,
 	releaseId: string,
 	db: DB = getDb(),
 	now: number = Date.now()
 ): void {
 	db.prepare(
-		`INSERT INTO subscription_seen (browse_id, release_id, seen_at) VALUES (?, ?, ?)
-		 ON CONFLICT (browse_id, release_id) DO NOTHING`
-	).run(browseId, releaseId, now);
+		`INSERT INTO subscription_seen (browse_id, created_by, release_id, seen_at) VALUES (?, ?, ?, ?)
+		 ON CONFLICT (browse_id, created_by, release_id) DO NOTHING`
+	).run(browseId, createdBy, releaseId, now);
 }
 
-export function markChecked(browseId: string, db: DB = getDb(), now: number = Date.now()): void {
-	db.prepare('UPDATE artist_subscriptions SET last_checked_at = ? WHERE browse_id = ?').run(
-		now,
-		browseId
-	);
+export function markChecked(
+	browseId: string,
+	createdBy: string,
+	db: DB = getDb(),
+	now: number = Date.now()
+): void {
+	db.prepare(
+		'UPDATE artist_subscriptions SET last_checked_at = ? WHERE browse_id = ? AND created_by = ?'
+	).run(now, browseId, createdBy);
 }

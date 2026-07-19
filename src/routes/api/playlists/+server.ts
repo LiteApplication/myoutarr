@@ -11,8 +11,8 @@ import type { RequestHandler } from './$types';
 /** YT Music playlist ids (VL…/PL…/OLAK5uy…/RD…) are word-safe and reasonably long. */
 const PLAYLIST_ID = /^[A-Za-z0-9_-]{10,}$/;
 
-export const GET: RequestHandler = () => {
-	return json({ subscriptions: listPlaylistSubscriptions() });
+export const GET: RequestHandler = ({ locals }) => {
+	return json({ subscriptions: listPlaylistSubscriptions(locals.session!.userId) });
 };
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -45,7 +45,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 };
 
-export const PATCH: RequestHandler = async ({ request }) => {
+export const PATCH: RequestHandler = async ({ request, locals }) => {
 	let body: { browseId?: unknown; enabled?: unknown };
 	try {
 		body = (await request.json()) as { browseId?: unknown; enabled?: unknown };
@@ -57,11 +57,11 @@ export const PATCH: RequestHandler = async ({ request }) => {
 	if (typeof body.enabled !== 'boolean') {
 		return json({ error: 'enabled must be a boolean' }, { status: 400 });
 	}
-	const updated = setPlaylistEnabled(browseId, body.enabled);
+	const updated = setPlaylistEnabled(browseId, locals.session!.userId, body.enabled);
 	return json({ updated });
 };
 
-export const DELETE: RequestHandler = async ({ request }) => {
+export const DELETE: RequestHandler = async ({ request, locals }) => {
 	let body: { browseId?: unknown };
 	try {
 		body = (await request.json()) as { browseId?: unknown };
@@ -70,6 +70,6 @@ export const DELETE: RequestHandler = async ({ request }) => {
 	}
 	const browseId = typeof body.browseId === 'string' ? body.browseId : '';
 	if (!browseId) return json({ error: 'browseId is required' }, { status: 400 });
-	const removed = unsubscribePlaylist(browseId);
+	const removed = unsubscribePlaylist(browseId, locals.session!.userId);
 	return json({ removed });
 };

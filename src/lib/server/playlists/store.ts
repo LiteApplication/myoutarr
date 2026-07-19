@@ -49,61 +49,91 @@ export function subscribePlaylist(
 	const upsertSub = db.prepare(
 		`INSERT INTO playlist_subscriptions (browse_id, title, thumbnail, created_by, created_at)
 		 VALUES (?, ?, ?, ?, ?)
-		 ON CONFLICT (browse_id) DO UPDATE SET
+		 ON CONFLICT (browse_id, created_by) DO UPDATE SET
 			title = excluded.title, thumbnail = excluded.thumbnail, enabled = 1`
 	);
 	const upsertSeen = db.prepare(
-		`INSERT INTO playlist_seen (browse_id, video_id, seen_at) VALUES (?, ?, ?)
-		 ON CONFLICT (browse_id, video_id) DO NOTHING`
+		`INSERT INTO playlist_seen (browse_id, created_by, video_id, seen_at) VALUES (?, ?, ?, ?)
+		 ON CONFLICT (browse_id, created_by, video_id) DO NOTHING`
 	);
 	db.transaction(() => {
 		upsertSub.run(input.browseId, input.title, input.thumbnail, input.createdBy, now);
-		for (const videoId of seedVideoIds) upsertSeen.run(input.browseId, videoId, now);
+		for (const videoId of seedVideoIds)
+			upsertSeen.run(input.browseId, input.createdBy, videoId, now);
 	})();
-	return getPlaylistSubscription(input.browseId, db) as PlaylistSubscription;
+	return getPlaylistSubscription(input.browseId, input.createdBy, db) as PlaylistSubscription;
 }
 
-export function unsubscribePlaylist(browseId: string, db: DB = getDb()): boolean {
+export function unsubscribePlaylist(
+	browseId: string,
+	createdBy: string,
+	db: DB = getDb()
+): boolean {
 	// playlist_seen rows cascade via the foreign key.
 	return (
-		db.prepare('DELETE FROM playlist_subscriptions WHERE browse_id = ?').run(browseId).changes > 0
+		db
+			.prepare('DELETE FROM playlist_subscriptions WHERE browse_id = ? AND created_by = ?')
+			.run(browseId, createdBy).changes > 0
 	);
 }
 
 /** Toggle polling for one playlist without dropping its seen-set. */
-export function setPlaylistEnabled(browseId: string, enabled: boolean, db: DB = getDb()): boolean {
+export function setPlaylistEnabled(
+	browseId: string,
+	createdBy: string,
+	enabled: boolean,
+	db: DB = getDb()
+): boolean {
 	return (
 		db
-			.prepare('UPDATE playlist_subscriptions SET enabled = ? WHERE browse_id = ?')
-			.run(enabled ? 1 : 0, browseId).changes > 0
+			.prepare(
+				'UPDATE playlist_subscriptions SET enabled = ? WHERE browse_id = ? AND created_by = ?'
+			)
+			.run(enabled ? 1 : 0, browseId, createdBy).changes > 0
 	);
 }
 
 export function getPlaylistSubscription(
 	browseId: string,
+	createdBy: string,
 	db: DB = getDb()
 ): PlaylistSubscription | null {
 	const row = db
-		.prepare('SELECT * FROM playlist_subscriptions WHERE browse_id = ?')
-		.get(browseId) as PlaylistSubscriptionRow | undefined;
+		.prepare('SELECT * FROM playlist_subscriptions WHERE browse_id = ? AND created_by = ?')
+		.get(browseId, createdBy) as PlaylistSubscriptionRow | undefined;
 	return row ? rowToSubscription(row) : null;
 }
 
-export function isPlaylistSubscribed(browseId: string, db: DB = getDb()): boolean {
+export function isPlaylistSubscribed(
+	browseId: string,
+	createdBy: string,
+	db: DB = getDb()
+): boolean {
 	return (
-		db.prepare('SELECT 1 FROM playlist_subscriptions WHERE browse_id = ?').get(browseId) !==
-		undefined
+		db
+			.prepare('SELECT 1 FROM playlist_subscriptions WHERE browse_id = ? AND created_by = ?')
+			.get(browseId, createdBy) !== undefined
 	);
 }
 
-export function listPlaylistSubscriptions(db: DB = getDb()): PlaylistSubscription[] {
+/** One user's followed playlists. */
+export function listPlaylistSubscriptions(
+	createdBy: string,
+	db: DB = getDb()
+): PlaylistSubscription[] {
 	const rows = db
-		.prepare('SELECT * FROM playlist_subscriptions ORDER BY title COLLATE NOCASE')
-		.all() as PlaylistSubscriptionRow[];
+		.prepare(
+			'SELECT * FROM playlist_subscriptions WHERE created_by = ? ORDER BY title COLLATE NOCASE'
+		)
+		.all(createdBy) as PlaylistSubscriptionRow[];
 	return rows.map(rowToSubscription);
 }
 
-/** Enabled subscriptions whose last check is older than `intervalMs` (or never). */
+/**
+ * Enabled subscriptions (across all users) whose last check is older than
+ * `intervalMs` (or never). Background checks run for everyone; each row carries
+ * the owning user in `createdBy`.
+ */
 export function duePlaylistSubscriptions(
 	intervalMs: number,
 	db: DB = getDb(),
@@ -120,35 +150,36 @@ export function duePlaylistSubscriptions(
 }
 
 /** The set of video ids the subscription has already accounted for. */
-export function seenVideoIds(browseId: string, db: DB = getDb()): Set<string> {
+export function seenVideoIds(browseId: string, createdBy: string, db: DB = getDb()): Set<string> {
 	const rows = db
-		.prepare('SELECT video_id FROM playlist_seen WHERE browse_id = ?')
-		.all(browseId) as { video_id: string }[];
+		.prepare('SELECT video_id FROM playlist_seen WHERE browse_id = ? AND created_by = ?')
+		.all(browseId, createdBy) as { video_id: string }[];
 	return new Set(rows.map((r) => r.video_id));
 }
 
 export function markVideosSeen(
 	browseId: string,
+	createdBy: string,
 	videoIds: string[],
 	db: DB = getDb(),
 	now: number = Date.now()
 ): void {
 	const stmt = db.prepare(
-		`INSERT INTO playlist_seen (browse_id, video_id, seen_at) VALUES (?, ?, ?)
-		 ON CONFLICT (browse_id, video_id) DO NOTHING`
+		`INSERT INTO playlist_seen (browse_id, created_by, video_id, seen_at) VALUES (?, ?, ?, ?)
+		 ON CONFLICT (browse_id, created_by, video_id) DO NOTHING`
 	);
 	db.transaction(() => {
-		for (const videoId of videoIds) stmt.run(browseId, videoId, now);
+		for (const videoId of videoIds) stmt.run(browseId, createdBy, videoId, now);
 	})();
 }
 
 export function markPlaylistChecked(
 	browseId: string,
+	createdBy: string,
 	db: DB = getDb(),
 	now: number = Date.now()
 ): void {
-	db.prepare('UPDATE playlist_subscriptions SET last_checked_at = ? WHERE browse_id = ?').run(
-		now,
-		browseId
-	);
+	db.prepare(
+		'UPDATE playlist_subscriptions SET last_checked_at = ? WHERE browse_id = ? AND created_by = ?'
+	).run(now, browseId, createdBy);
 }

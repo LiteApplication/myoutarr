@@ -42,14 +42,14 @@ export async function checkSubscription(
 	deps: CheckDeps = defaultDeps
 ): Promise<CheckResult> {
 	const { releases } = await deps.getReleases(sub.browseId);
-	const seen = seenReleaseIds(sub.browseId, db);
+	const seen = seenReleaseIds(sub.browseId, sub.createdBy, db);
 	const batchIds: string[] = [];
 
 	for (const release of releases) {
 		if (seen.has(release.browseId)) continue;
 		try {
 			const batch = await deps.enqueueAlbum(release.browseId, sub.createdBy, sub.name, db);
-			markReleaseSeen(sub.browseId, release.browseId, db);
+			markReleaseSeen(sub.browseId, sub.createdBy, release.browseId, db);
 			if (batch) {
 				batchIds.push(batch.id);
 				console.log(`subscription: enqueued "${batch.title}" by ${sub.name}`);
@@ -63,7 +63,7 @@ export async function checkSubscription(
 		}
 	}
 
-	markChecked(sub.browseId, db);
+	markChecked(sub.browseId, sub.createdBy, db);
 	return { enqueued: batchIds.length, batchIds };
 }
 

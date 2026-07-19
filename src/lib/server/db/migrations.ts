@@ -138,5 +138,79 @@ export const migrations: string[] = [
 	// 5 - make playlist sync optional per batch
 	`
 	ALTER TABLE batches ADD COLUMN sync_jellyfin INTEGER NOT NULL DEFAULT 1;
+	`,
+	// 6 - multiuser: subscriptions become per-user. Until now a subscription keyed
+	// on browse_id alone, so two users following the same artist/playlist collided
+	// on one row (and shared one seen-set). Re-key both tables on
+	// (browse_id, created_by) so each user owns an independent subscription.
+	// Existing rows keep their recorded created_by (their real owner); nothing is
+	// reassigned. Table-rebuild recipe (foreign_keys stays ON inside the migration
+	// transaction): build the new tables under temp names, copy, drop the old ones,
+	// then rename - the parent rename rewrites the child FK to the final name.
+	`
+	CREATE TABLE artist_subscriptions_new (
+		browse_id       TEXT NOT NULL,
+		name            TEXT NOT NULL,
+		thumbnail       TEXT,
+		created_by      TEXT NOT NULL,            -- Jellyfin user id; owner of this subscription
+		created_at      INTEGER NOT NULL,
+		last_checked_at INTEGER,
+		PRIMARY KEY (browse_id, created_by)
+	) STRICT;
+	INSERT INTO artist_subscriptions_new (browse_id, name, thumbnail, created_by, created_at, last_checked_at)
+		SELECT browse_id, name, thumbnail, created_by, created_at, last_checked_at FROM artist_subscriptions;
+
+	CREATE TABLE subscription_seen_new (
+		browse_id  TEXT NOT NULL,
+		created_by TEXT NOT NULL,
+		release_id TEXT NOT NULL,
+		seen_at    INTEGER NOT NULL,
+		PRIMARY KEY (browse_id, created_by, release_id),
+		FOREIGN KEY (browse_id, created_by)
+			REFERENCES artist_subscriptions_new (browse_id, created_by) ON DELETE CASCADE
+	) STRICT;
+	INSERT INTO subscription_seen_new (browse_id, created_by, release_id, seen_at)
+		SELECT s.browse_id, a.created_by, s.release_id, s.seen_at
+		FROM subscription_seen s
+		JOIN artist_subscriptions a ON a.browse_id = s.browse_id;
+
+	DROP TABLE subscription_seen;
+	DROP TABLE artist_subscriptions;
+	ALTER TABLE artist_subscriptions_new RENAME TO artist_subscriptions;
+	ALTER TABLE subscription_seen_new RENAME TO subscription_seen;
+	CREATE INDEX idx_artist_subs_user ON artist_subscriptions (created_by);
+
+	CREATE TABLE playlist_subscriptions_new (
+		browse_id       TEXT NOT NULL,
+		title           TEXT NOT NULL,
+		thumbnail       TEXT,
+		enabled         INTEGER NOT NULL DEFAULT 1,
+		created_by      TEXT NOT NULL,            -- Jellyfin user id; owner of this subscription
+		created_at      INTEGER NOT NULL,
+		last_checked_at INTEGER,
+		PRIMARY KEY (browse_id, created_by)
+	) STRICT;
+	INSERT INTO playlist_subscriptions_new (browse_id, title, thumbnail, enabled, created_by, created_at, last_checked_at)
+		SELECT browse_id, title, thumbnail, enabled, created_by, created_at, last_checked_at FROM playlist_subscriptions;
+
+	CREATE TABLE playlist_seen_new (
+		browse_id  TEXT NOT NULL,
+		created_by TEXT NOT NULL,
+		video_id   TEXT NOT NULL,
+		seen_at    INTEGER NOT NULL,
+		PRIMARY KEY (browse_id, created_by, video_id),
+		FOREIGN KEY (browse_id, created_by)
+			REFERENCES playlist_subscriptions_new (browse_id, created_by) ON DELETE CASCADE
+	) STRICT;
+	INSERT INTO playlist_seen_new (browse_id, created_by, video_id, seen_at)
+		SELECT s.browse_id, p.created_by, s.video_id, s.seen_at
+		FROM playlist_seen s
+		JOIN playlist_subscriptions p ON p.browse_id = s.browse_id;
+
+	DROP TABLE playlist_seen;
+	DROP TABLE playlist_subscriptions;
+	ALTER TABLE playlist_subscriptions_new RENAME TO playlist_subscriptions;
+	ALTER TABLE playlist_seen_new RENAME TO playlist_seen;
+	CREATE INDEX idx_playlist_subs_user ON playlist_subscriptions (created_by);
 	`
 ];

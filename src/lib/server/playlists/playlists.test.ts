@@ -67,36 +67,36 @@ function sub() {
 describe('playlist subscription store', () => {
 	it('subscribes, seeds the seen-set, and reports membership', () => {
 		sub();
-		expect(isPlaylistSubscribed(PLAYLIST, db)).toBe(true);
-		expect(listPlaylistSubscriptions(db)).toHaveLength(1);
-		expect(seenVideoIds(PLAYLIST, db)).toEqual(new Set(['a', 'b']));
+		expect(isPlaylistSubscribed(PLAYLIST, 'user1', db)).toBe(true);
+		expect(listPlaylistSubscriptions('user1', db)).toHaveLength(1);
+		expect(seenVideoIds(PLAYLIST, 'user1', db)).toEqual(new Set(['a', 'b']));
 	});
 
 	it('re-subscribing tops up the seen-set and re-enables', () => {
 		sub();
-		setPlaylistEnabled(PLAYLIST, false, db);
+		setPlaylistEnabled(PLAYLIST, 'user1', false, db);
 		subscribePlaylist(
 			{ browseId: PLAYLIST, title: 'Renamed', thumbnail: 'x', createdBy: 'user1' },
 			['b', 'c'],
 			db
 		);
-		expect(listPlaylistSubscriptions(db)).toHaveLength(1);
-		expect(listPlaylistSubscriptions(db)[0].title).toBe('Renamed');
-		expect(listPlaylistSubscriptions(db)[0].enabled).toBe(true);
-		expect(seenVideoIds(PLAYLIST, db)).toEqual(new Set(['a', 'b', 'c']));
+		expect(listPlaylistSubscriptions('user1', db)).toHaveLength(1);
+		expect(listPlaylistSubscriptions('user1', db)[0].title).toBe('Renamed');
+		expect(listPlaylistSubscriptions('user1', db)[0].enabled).toBe(true);
+		expect(seenVideoIds(PLAYLIST, 'user1', db)).toEqual(new Set(['a', 'b', 'c']));
 	});
 
 	it('unsubscribe cascades the seen-set away', () => {
 		sub();
-		expect(unsubscribePlaylist(PLAYLIST, db)).toBe(true);
-		expect(isPlaylistSubscribed(PLAYLIST, db)).toBe(false);
-		expect(seenVideoIds(PLAYLIST, db).size).toBe(0);
+		expect(unsubscribePlaylist(PLAYLIST, 'user1', db)).toBe(true);
+		expect(isPlaylistSubscribed(PLAYLIST, 'user1', db)).toBe(false);
+		expect(seenVideoIds(PLAYLIST, 'user1', db).size).toBe(0);
 	});
 
 	it('a disabled playlist is not due for a check', () => {
 		sub();
 		expect(duePlaylistSubscriptions(24 * 3600_000, db)).toHaveLength(1);
-		setPlaylistEnabled(PLAYLIST, false, db);
+		setPlaylistEnabled(PLAYLIST, 'user1', false, db);
 		expect(duePlaylistSubscriptions(24 * 3600_000, db)).toHaveLength(0);
 	});
 });
@@ -105,14 +105,14 @@ describe('checkPlaylistSubscription', () => {
 	it('enqueues only songs added since following, then marks them seen', async () => {
 		sub(); // seen: a, b
 		const result = await checkPlaylistSubscription(
-			listPlaylistSubscriptions(db)[0],
+			listPlaylistSubscriptions('user1', db)[0],
 			db,
 			deps(['a', 'b', 'c'])
 		);
 
 		expect(result.enqueued).toBe(1);
-		expect(seenVideoIds(PLAYLIST, db).has('c')).toBe(true);
-		expect(listPlaylistSubscriptions(db)[0].lastCheckedAt).not.toBeNull();
+		expect(seenVideoIds(PLAYLIST, 'user1', db).has('c')).toBe(true);
+		expect(listPlaylistSubscriptions('user1', db)[0].lastCheckedAt).not.toBeNull();
 
 		// The new song became a playlist batch with one queued job for 'c'.
 		const batch = db.prepare("SELECT id, title FROM batches WHERE kind = 'playlist'").get() as {
@@ -128,9 +128,13 @@ describe('checkPlaylistSubscription', () => {
 
 	it('is a no-op on the second run when nothing new appeared', async () => {
 		sub();
-		await checkPlaylistSubscription(listPlaylistSubscriptions(db)[0], db, deps(['a', 'b', 'c']));
+		await checkPlaylistSubscription(
+			listPlaylistSubscriptions('user1', db)[0],
+			db,
+			deps(['a', 'b', 'c'])
+		);
 		const result = await checkPlaylistSubscription(
-			listPlaylistSubscriptions(db)[0],
+			listPlaylistSubscriptions('user1', db)[0],
 			db,
 			deps(['a', 'b', 'c'])
 		);
