@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -6,6 +7,8 @@
 	let cover = $derived(data.song.thumbnails.at(-1)?.url ?? '');
 	let queueState = $state<'idle' | 'working' | 'queued' | 'error'>('idle');
 	let queueError = $state('');
+	let deleteState = $state<'idle' | 'working' | 'done' | 'error'>('idle');
+	let isDownloaded = $state(data.isDownloaded);
 
 	// Track ids currently being queued from the "related" list, so each row can
 	// reflect its own state independently of the main download button.
@@ -81,24 +84,56 @@
 			{#if data.song.duration}&nbsp;·&nbsp;{data.song.duration}{/if}
 		</p>
 		<div class="mt-4 flex flex-wrap items-center gap-3">
-			<button
-				onclick={download}
-				disabled={queueState === 'working'}
-				class="rounded-full px-6 py-2 text-sm font-medium transition disabled:opacity-50
-					{data.isDownloaded && queueState === 'idle'
-					? 'border border-ok bg-ok/15 text-ok hover:bg-ok/25'
-					: 'bg-accent text-accent-ink hover:bg-accent-hover'}"
-			>
-				{queueState === 'working'
-					? 'Queuing…'
-					: queueState === 'queued'
-						? 'Queued ✓'
-						: data.isDownloaded
-							? 'Downloaded ✓'
+			{#if isDownloaded && queueState === 'idle'}
+				<!-- Downloaded → hover becomes Delete -->
+				<form
+					method="POST"
+					action="?/delete"
+					use:enhance={() => {
+						deleteState = 'working';
+						return async ({ result, update }) => {
+							await update();
+							if (result.type === 'success') {
+								isDownloaded = false;
+								deleteState = 'done';
+							} else {
+								deleteState = 'error';
+							}
+						};
+					}}
+				>
+					<input type="hidden" name="outputPath" value={data.outputPath} />
+					<button
+						type="submit"
+						disabled={deleteState === 'working'}
+						class="group/del relative rounded-full border px-6 py-2 text-sm font-medium transition disabled:opacity-50
+							border-ok bg-ok/15 text-ok hover:border-danger hover:bg-danger/15 hover:text-danger"
+						title="Delete from library"
+					>
+						<span class="group-hover/del:hidden">
+							{deleteState === 'working' ? 'Deleting…' : 'Downloaded ✓'}
+						</span>
+						<span class="hidden group-hover/del:inline">Delete song</span>
+					</button>
+				</form>
+			{:else}
+				<button
+					onclick={download}
+					disabled={queueState === 'working'}
+					class="rounded-full px-6 py-2 text-sm font-medium transition disabled:opacity-50 bg-accent text-accent-ink hover:bg-accent-hover"
+				>
+					{queueState === 'working'
+						? 'Queuing…'
+						: queueState === 'queued'
+							? 'Queued ✓'
 							: 'Download song'}
-			</button>
+				</button>
+			{/if}
 			{#if queueState === 'error'}
 				<span class="text-sm text-danger" role="alert">{queueError}</span>
+			{/if}
+			{#if deleteState === 'error'}
+				<span class="text-sm text-danger" role="alert">Delete failed</span>
 			{/if}
 		</div>
 	</div>

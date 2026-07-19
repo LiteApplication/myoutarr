@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -7,6 +8,10 @@
 	let artistNames = $derived(data.album.artists.map((a) => a.name).join(', '));
 	let queueState = $state<'idle' | 'working' | 'queued' | 'error'>('idle');
 	let queueError = $state('');
+	let deleteState = $state<'idle' | 'working' | 'done' | 'error'>('idle');
+	let isDownloaded = $state(data.isDownloaded);
+	// Per-track deleted state: videoId -> true when deleted client-side
+	let deletedTracks = $state<Record<string, boolean>>({});
 
 	async function download(videoId?: string) {
 		queueState = 'working';
@@ -55,24 +60,56 @@
 					.duration}{/if}
 		</p>
 		<div class="mt-4 flex items-center gap-3">
-			<button
-				onclick={() => download()}
-				disabled={queueState === 'working'}
-				class="rounded-full px-6 py-2 text-sm font-medium transition disabled:opacity-50
-					{data.isDownloaded && queueState === 'idle'
-					? 'border border-ok bg-ok/15 text-ok hover:bg-ok/25'
-					: 'bg-accent text-accent-ink hover:bg-accent-hover'}"
-			>
-				{queueState === 'working'
-					? 'Queuing…'
-					: queueState === 'queued'
-						? 'Queued ✓'
-						: data.isDownloaded
-							? 'Downloaded ✓'
+			{#if isDownloaded && queueState === 'idle'}
+				<!-- Downloaded → hover becomes Delete album -->
+				<form
+					method="POST"
+					action="?/delete"
+					use:enhance={() => {
+						deleteState = 'working';
+						return async ({ result, update }) => {
+							await update();
+							if (result.type === 'success') {
+								isDownloaded = false;
+								deleteState = 'done';
+							} else {
+								deleteState = 'error';
+							}
+						};
+					}}
+				>
+					<input type="hidden" name="relative" value={data.albumRelativeDir} />
+					<button
+						type="submit"
+						disabled={deleteState === 'working'}
+						class="group/del rounded-full border px-6 py-2 text-sm font-medium transition disabled:opacity-50
+							border-ok bg-ok/15 text-ok hover:border-danger hover:bg-danger/15 hover:text-danger"
+						title="Delete album from library"
+					>
+						<span class="group-hover/del:hidden">
+							{deleteState === 'working' ? 'Deleting…' : 'Downloaded ✓'}
+						</span>
+						<span class="hidden group-hover/del:inline">Delete album</span>
+					</button>
+				</form>
+			{:else}
+				<button
+					onclick={() => download()}
+					disabled={queueState === 'working'}
+					class="rounded-full px-6 py-2 text-sm font-medium transition disabled:opacity-50 bg-accent text-accent-ink hover:bg-accent-hover"
+				>
+					{queueState === 'working'
+						? 'Queuing…'
+						: queueState === 'queued'
+							? 'Queued ✓'
 							: 'Download album'}
-			</button>
+				</button>
+			{/if}
 			{#if queueState === 'error'}
 				<span class="text-sm text-accent-hover" role="alert">{queueError}</span>
+			{/if}
+			{#if deleteState === 'error'}
+				<span class="text-sm text-danger" role="alert">Delete failed</span>
 			{/if}
 		</div>
 	</div>
@@ -98,21 +135,39 @@
 			</div>
 			<span class="text-xs tabular-nums text-ink-faint">{track.duration ?? ''}</span>
 			{#if track.isAvailable && track.videoId}
-				{#if track.isDownloaded}
-					<span class="rounded-full p-2 text-ok shrink-0" title="Already downloaded">
-						<svg
-							viewBox="0 0 24 24"
-							class="h-4 w-4"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2.5"
-							stroke-linecap="round"
-							stroke-linejoin="round"
+				{#if track.isDownloaded && !deletedTracks[track.videoId!]}
+					<!-- Track checkmark → hover becomes Delete track -->
+					<form
+						method="POST"
+						action="?/delete"
+						use:enhance={() => {
+							return async ({ result, update }) => {
+								await update();
+								if (result.type === 'success') {
+									deletedTracks = { ...deletedTracks, [track.videoId!]: true };
+									isDownloaded = false;
+								}
+							};
+						}}
+					>
+						<input type="hidden" name="relative" value={track.trackRelativePath ?? ''} />
+						<button
+							type="submit"
+							class="group/del shrink-0 rounded-full p-2 transition text-ok hover:text-danger hover:bg-danger/10 lg:invisible lg:group-hover:visible"
+							title="Delete track from library"
+							aria-label="Delete {track.title}"
 						>
-							<path d="M20 6 9 17l-5-5" />
-						</svg>
-					</span>
-				{:else}
+							<!-- Default: checkmark -->
+							<svg viewBox="0 0 24 24" class="h-4 w-4 group-hover/del:hidden" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+								<path d="M20 6 9 17l-5-5" />
+							</svg>
+							<!-- Hover: trash icon -->
+							<svg viewBox="0 0 24 24" class="h-4 w-4 hidden group-hover/del:block" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+							</svg>
+						</button>
+					</form>
+				{:else if !deletedTracks[track.videoId!]}
 					<button
 						onclick={() => download(track.videoId!)}
 						class="rounded-full p-2 text-ink-muted transition hover:bg-surface-3 hover:text-ink lg:invisible lg:group-hover:visible"
