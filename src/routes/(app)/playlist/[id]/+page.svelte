@@ -7,6 +7,7 @@
 	let cover = $derived(data.playlist.thumbnails.at(-1)?.url ?? '');
 	let queueState = $state<'idle' | 'working' | 'queued' | 'error'>('idle');
 	let queueError = $state('');
+	let syncJellyfin = $state(true);
 	let syncBusy = $state(false);
 
 	async function toggleSync() {
@@ -29,7 +30,11 @@
 			const response = await fetch('/api/queue', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ kind: 'playlist', browseId: data.playlist.browseId })
+				body: JSON.stringify({
+					kind: 'playlist',
+					browseId: data.playlist.browseId,
+					syncJellyfin
+				})
 			});
 			if (!response.ok) {
 				const body = await response.json().catch(() => ({}));
@@ -57,39 +62,45 @@
 		<p class="mt-2 text-sm text-ink-muted">
 			{data.playlist.author ?? ''} · {data.playlist.trackCount} tracks
 		</p>
-		<div class="mt-4 flex items-center gap-3">
-			<button
-				onclick={downloadAll}
-				disabled={queueState === 'working'}
-				class="rounded-full px-6 py-2 text-sm font-medium transition disabled:opacity-50
-					{data.isDownloaded && queueState === 'idle'
-					? 'border border-ok bg-ok/15 text-ok hover:bg-ok/25'
-					: 'bg-accent text-accent-ink hover:bg-accent-hover'}"
-			>
-				{queueState === 'working'
-					? 'Queuing…'
-					: queueState === 'queued'
-						? 'Queued ✓'
-						: data.isDownloaded
-							? 'Downloaded ✓'
-							: 'Download playlist'}
-			</button>
-			<button
-				onclick={toggleSync}
-				disabled={syncBusy}
-				class={[
-					'rounded-full border px-5 py-2 text-sm font-medium transition disabled:opacity-50',
-					data.synced
-						? 'border-accent text-accent hover:bg-surface-2'
-						: 'border-line text-ink-muted hover:bg-surface-2 hover:text-ink'
-				]}
-				title="Automatically download songs added to this playlist and keep the Jellyfin playlist in sync"
-			>
-				{syncBusy ? '…' : data.synced ? 'Syncing ✓' : 'Sync new songs'}
-			</button>
-			{#if queueState === 'error'}
-				<span class="text-sm text-danger" role="alert">{queueError}</span>
-			{/if}
+		<div class="mt-4 flex flex-col gap-3">
+			<div class="flex items-center gap-3">
+				<button
+					onclick={downloadAll}
+					disabled={queueState === 'working'}
+					class="rounded-full px-6 py-2 text-sm font-medium transition disabled:opacity-50
+						{data.isDownloaded && queueState === 'idle'
+						? 'border border-ok bg-ok/15 text-ok hover:bg-ok/25'
+						: 'bg-accent text-accent-ink hover:bg-accent-hover'}"
+				>
+					{queueState === 'working'
+						? 'Queuing…'
+						: queueState === 'queued'
+							? 'Queued ✓'
+							: data.isDownloaded
+								? 'Downloaded ✓'
+								: 'Download playlist'}
+				</button>
+				<button
+					onclick={toggleSync}
+					disabled={syncBusy}
+					class={[
+						'rounded-full border px-5 py-2 text-sm font-medium transition disabled:opacity-50',
+						data.synced
+							? 'border-accent text-accent hover:bg-surface-2'
+							: 'border-line text-ink-muted hover:bg-surface-2 hover:text-ink'
+					]}
+					title="Automatically download songs added to this playlist and keep the Jellyfin playlist in sync"
+				>
+					{syncBusy ? '…' : data.synced ? 'Syncing ✓' : 'Sync new songs'}
+				</button>
+				{#if queueState === 'error'}
+					<span class="text-sm text-danger" role="alert">{queueError}</span>
+				{/if}
+			</div>
+			<label class="flex items-center gap-2 text-xs text-ink-muted select-none">
+				<input type="checkbox" bind:checked={syncJellyfin} class="accent-accent" />
+				Add to Jellyfin playlists
+			</label>
 		</div>
 	</div>
 </header>

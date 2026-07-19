@@ -134,5 +134,9 @@ export const migrations: string[] = [
 		added_at    INTEGER NOT NULL,
 		PRIMARY KEY (playlist_id, video_id)
 	) STRICT;
+	`,
+	// 5 - make playlist sync optional per batch
+	`
+	ALTER TABLE batches ADD COLUMN sync_jellyfin INTEGER NOT NULL DEFAULT 1;
 	`
 ];

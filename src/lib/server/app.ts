@@ -57,9 +57,9 @@ export function getPool(): WorkerPool {
 			// appears progressively rather than only when the whole batch drains.
 			onJobCompleted: (batchId) => {
 				const batch = getDb()
-					.prepare("SELECT id FROM batches WHERE id = ? AND kind = 'playlist'")
-					.get(batchId);
-				if (!batch) return;
+					.prepare("SELECT id, sync_jellyfin FROM batches WHERE id = ? AND kind = 'playlist'")
+					.get(batchId) as { id: string; sync_jellyfin: number } | undefined;
+				if (!batch || batch.sync_jellyfin === 0) return;
 				scheduleRefresh();
 				scheduleIncrementalPlaylistSync(batchId);
 			}

@@ -15,7 +15,7 @@ import { createBatch, findCompletedDownload } from './store.ts';
 export type EnqueueRequest =
 	| { kind: 'song'; videoId: string; albumBrowseId?: string }
 	| { kind: 'album'; browseId: string }
-	| { kind: 'playlist'; browseId: string }
+	| { kind: 'playlist'; browseId: string; syncJellyfin?: boolean }
 	| { kind: 'artist'; browseId: string };
 
 function albumTrackMeta(album: AlbumDetail): NewTrack[] {
@@ -178,7 +178,8 @@ export async function enqueue(
 					title: playlist.title,
 					artist: playlist.author ?? undefined,
 					thumbnail: playlist.thumbnails.at(-1)?.url,
-					createdBy: userId
+					createdBy: userId,
+					syncJellyfin: request.syncJellyfin !== false
 				},
 				tracks,
 				db

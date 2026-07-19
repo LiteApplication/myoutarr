@@ -46,6 +46,7 @@ export interface Batch {
 	thumbnail: string | null;
 	createdAt: number;
 	createdBy: string;
+	syncJellyfin: boolean;
 }
 
 export interface NewTrack {
@@ -100,6 +101,7 @@ export function createBatch(
 		createdBy: string;
 		/** Materialise into the Jellyfin playlist by prepending, not appending. */
 		prepend?: boolean;
+		syncJellyfin?: boolean;
 	},
 	tracks: NewTrack[],
 	db: DB = getDb()
@@ -113,11 +115,12 @@ export function createBatch(
 		artist: input.artist ?? null,
 		thumbnail: input.thumbnail ?? null,
 		createdAt: Date.now(),
-		createdBy: input.createdBy
+		createdBy: input.createdBy,
+		syncJellyfin: input.syncJellyfin !== false
 	};
 	const insertBatch = db.prepare(
-		`INSERT INTO batches (id, kind, source_id, title, artist, thumbnail, created_at, created_by, prepend)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		`INSERT INTO batches (id, kind, source_id, title, artist, thumbnail, created_at, created_by, prepend, sync_jellyfin)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	);
 	const nextPosition =
 		((db.prepare('SELECT MAX(position) AS p FROM jobs').get() as { p: number | null }).p ?? -1) + 1;
@@ -141,7 +144,8 @@ export function createBatch(
 			batch.thumbnail,
 			batch.createdAt,
 			batch.createdBy,
-			input.prepend ? 1 : 0
+			input.prepend ? 1 : 0,
+			batch.syncJellyfin ? 1 : 0
 		);
 		tracks.forEach((track, index) => {
 			const id = randomUUID();
@@ -339,6 +343,7 @@ export function listQueue(db: DB = getDb(), limit = 50): BatchWithJobs[] {
 		created_at: number;
 		created_by: string;
 		jellyfin_playlist_id: string | null;
+		sync_jellyfin: number;
 	}[];
 	const jobsFor = db.prepare('SELECT * FROM jobs WHERE batch_id = ? ORDER BY position');
 	return batches.map((b) => ({
@@ -351,6 +356,7 @@ export function listQueue(db: DB = getDb(), limit = 50): BatchWithJobs[] {
 		createdAt: b.created_at,
 		createdBy: b.created_by,
 		jellyfinPlaylistId: b.jellyfin_playlist_id,
+		syncJellyfin: b.sync_jellyfin !== 0,
 		jobs: (jobsFor.all(b.id) as JobRow[]).map(rowToJob)
 	}));
 }

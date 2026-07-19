@@ -90,9 +90,11 @@ export async function syncPlaylistBatch(
 				created_by: string;
 				jellyfin_playlist_id: string | null;
 				prepend: number;
+				sync_jellyfin: number;
 		  }
 		| undefined;
 	if (!batch) return null;
+	if (batch.sync_jellyfin === 0) return null;
 
 	const jobs = db
 		.prepare(
