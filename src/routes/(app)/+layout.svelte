@@ -18,8 +18,8 @@
 	});
 
 	onMount(() => {
-		if (browser && 'serviceWorker' in navigator) {
-			navigator.serviceWorker.register('/service-worker.js', {
+		if (browser && 'serviceWorker' in globalThis.navigator) {
+			globalThis.navigator.serviceWorker.register('/service-worker.js', {
 				type: 'module'
 			});
 		}

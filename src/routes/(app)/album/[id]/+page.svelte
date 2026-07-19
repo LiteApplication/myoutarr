@@ -58,13 +58,18 @@
 			<button
 				onclick={() => download()}
 				disabled={queueState === 'working'}
-				class="rounded-full bg-accent px-6 py-2 text-sm font-medium text-accent-ink transition hover:bg-accent-hover disabled:opacity-50"
+				class="rounded-full px-6 py-2 text-sm font-medium transition disabled:opacity-50
+					{data.isDownloaded && queueState === 'idle'
+					? 'border border-ok bg-ok/15 text-ok hover:bg-ok/25'
+					: 'bg-accent text-accent-ink hover:bg-accent-hover'}"
 			>
 				{queueState === 'working'
 					? 'Queuing…'
 					: queueState === 'queued'
 						? 'Queued ✓'
-						: 'Download album'}
+						: data.isDownloaded
+							? 'Downloaded ✓'
+							: 'Download album'}
 			</button>
 			{#if queueState === 'error'}
 				<span class="text-sm text-accent-hover" role="alert">{queueError}</span>
@@ -93,24 +98,40 @@
 			</div>
 			<span class="text-xs tabular-nums text-ink-faint">{track.duration ?? ''}</span>
 			{#if track.isAvailable && track.videoId}
-				<button
-					onclick={() => download(track.videoId!)}
-					class="rounded-full p-2 text-ink-muted transition hover:bg-surface-3 hover:text-ink lg:invisible lg:group-hover:visible"
-					aria-label="Download {track.title}"
-					title="Download this track"
-				>
-					<svg
-						viewBox="0 0 24 24"
-						class="h-4 w-4"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
+				{#if track.isDownloaded}
+					<span class="rounded-full p-2 text-ok shrink-0" title="Already downloaded">
+						<svg
+							viewBox="0 0 24 24"
+							class="h-4 w-4"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.5"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M20 6 9 17l-5-5" />
+						</svg>
+					</span>
+				{:else}
+					<button
+						onclick={() => download(track.videoId!)}
+						class="rounded-full p-2 text-ink-muted transition hover:bg-surface-3 hover:text-ink lg:invisible lg:group-hover:visible"
+						aria-label="Download {track.title}"
+						title="Download this track"
 					>
-						<path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16" />
-					</svg>
-				</button>
+						<svg
+							viewBox="0 0 24 24"
+							class="h-4 w-4"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16" />
+						</svg>
+					</button>
+				{/if}
 			{/if}
 		</li>
 	{/each}

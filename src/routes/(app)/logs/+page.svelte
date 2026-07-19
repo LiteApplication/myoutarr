@@ -13,6 +13,21 @@
 	let filter = $state<Filter>('all');
 	let expandedError = $state<string | null>(null);
 
+	function batchLinkHref(kind: string, sourceId: string, videoId: string): string {
+		switch (kind) {
+			case 'album':
+				return `/album/${sourceId}`;
+			case 'artist':
+				return `/artist/${sourceId}`;
+			case 'playlist':
+				return `/playlist/${sourceId}`;
+			case 'song':
+				return `/song/${videoId}`;
+			default:
+				return '#';
+		}
+	}
+
 	const counts = $derived({
 		all: data.entries.length,
 		completed: data.entries.filter((e) => e.status === 'completed').length,
@@ -95,12 +110,24 @@
 			<li class="border-b border-line last:border-b-0 px-4 py-3">
 				<div class="flex items-center gap-3">
 					{#if entry.thumbnail}
-						<img src={entry.thumbnail} alt="" class="h-10 w-10 shrink-0 rounded object-cover" />
+						<a href="/song/{entry.videoId}" class="shrink-0">
+							<img src={entry.thumbnail} alt="" class="h-10 w-10 rounded object-cover" />
+						</a>
 					{/if}
 					<div class="min-w-0 flex-1">
-						<p class="truncate text-sm text-ink">{entry.title}</p>
+						<p class="truncate text-sm text-ink">
+							<a href="/song/{entry.videoId}" class="hover:underline">{entry.title}</a>
+						</p>
 						<p class="truncate text-xs text-ink-muted">
-							{entry.artist ? `${entry.artist} · ` : ''}{entry.batchTitle} · {entry.batchKind}
+							{#if entry.artist}{entry.artist} ·
+							{/if}
+							<a
+								href={batchLinkHref(entry.batchKind, entry.batchSourceId, entry.videoId)}
+								class="hover:underline text-ink-muted hover:text-ink"
+							>
+								{entry.batchTitle}
+							</a>
+							· {entry.batchKind}
 						</p>
 					</div>
 					<div class="shrink-0 text-right">

@@ -17,7 +17,11 @@
 		return filter ? `/search?${query}&filter=${filter}` : `/search?${query}`;
 	}
 
-	let songs = $derived(data.results.filter((r) => r.kind === 'song'));
+	let songs = $derived(
+		data.results.filter(
+			(r) => r.kind === 'song'
+		) as (import('$lib/server/ytmusic/api').SongResult & { isDownloaded?: boolean })[]
+	);
 	let cards = $derived(data.results.filter((r) => r.kind !== 'song'));
 </script>
 
@@ -65,6 +69,21 @@
 								{#if song.album}&nbsp;·&nbsp;{song.album.name}{/if}
 							</p>
 						</div>
+						{#if song.isDownloaded}
+							<span
+								class="flex items-center gap-1 text-xs text-ok bg-ok/10 rounded-full px-2 py-0.5"
+								title="Downloaded"
+							>
+								<svg viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+									<path
+										fill-rule="evenodd"
+										d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 0 1 1.4-1.4l3.8 3.79 6.8-6.8a1 1 0 0 1 1.4 0Z"
+										clip-rule="evenodd"
+									/>
+								</svg>
+								Downloaded
+							</span>
+						{/if}
 						<span class="text-xs text-ink-faint">{song.duration ?? ''}</span>
 						{#if song.album?.id}
 							<a

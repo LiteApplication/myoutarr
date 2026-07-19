@@ -14,6 +14,21 @@
 	};
 
 	let expandedError = $state<string | null>(null);
+
+	function batchLinkHref(b: { kind: string; sourceId: string }): string {
+		switch (b.kind) {
+			case 'album':
+				return `/album/${b.sourceId}`;
+			case 'artist':
+				return `/artist/${b.sourceId}`;
+			case 'playlist':
+				return `/playlist/${b.sourceId}`;
+			case 'song':
+				return `/song/${b.sourceId}`;
+			default:
+				return '#';
+		}
+	}
 </script>
 
 <svelte:head>
@@ -49,10 +64,14 @@
 		<section class="overflow-hidden rounded-xl bg-surface">
 			<header class="flex items-center gap-4 border-b border-line px-4 py-3">
 				{#if batch.thumbnail}
-					<img src={batch.thumbnail} alt="" class="h-12 w-12 rounded object-cover" />
+					<a href={batchLinkHref(batch)} class="shrink-0">
+						<img src={batch.thumbnail} alt="" class="h-12 w-12 rounded object-cover" />
+					</a>
 				{/if}
 				<div class="min-w-0 flex-1">
-					<p class="truncate font-medium text-ink">{batch.title}</p>
+					<p class="truncate font-medium text-ink">
+						<a href={batchLinkHref(batch)} class="hover:underline">{batch.title}</a>
+					</p>
 					<p class="truncate text-xs text-ink-muted">
 						{batch.artist ?? ''} · {batch.kind} · {done.length}/{batch.jobs.length} done
 					</p>
@@ -97,7 +116,9 @@
 						<div class="flex items-center gap-3">
 							<span class="w-20 shrink-0 text-xs {statusStyles[job.status]}">{job.status}</span>
 							<div class="min-w-0 flex-1">
-								<p class="truncate text-sm text-ink">{job.meta.title}</p>
+								<p class="truncate text-sm text-ink">
+									<a href="/song/{job.videoId}" class="hover:underline">{job.meta.title}</a>
+								</p>
 								{#if job.status === 'running'}
 									<div class="mt-1 h-1 overflow-hidden rounded-full bg-surface-3">
 										<div

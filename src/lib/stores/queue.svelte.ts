@@ -13,6 +13,7 @@ export interface QueueJob {
 export interface QueueBatch {
 	id: string;
 	kind: string;
+	sourceId: string;
 	title: string;
 	artist: string | null;
 	thumbnail: string | null;

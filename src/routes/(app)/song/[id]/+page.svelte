@@ -84,13 +84,18 @@
 			<button
 				onclick={download}
 				disabled={queueState === 'working'}
-				class="rounded-full bg-accent px-6 py-2 text-sm font-medium text-accent-ink transition hover:bg-accent-hover disabled:opacity-50"
+				class="rounded-full px-6 py-2 text-sm font-medium transition disabled:opacity-50
+					{data.isDownloaded && queueState === 'idle'
+					? 'border border-ok bg-ok/15 text-ok hover:bg-ok/25'
+					: 'bg-accent text-accent-ink hover:bg-accent-hover'}"
 			>
 				{queueState === 'working'
 					? 'Queuing…'
 					: queueState === 'queued'
 						? 'Queued ✓'
-						: 'Download song'}
+						: data.isDownloaded
+							? 'Downloaded ✓'
+							: 'Download song'}
 			</button>
 			{#if queueState === 'error'}
 				<span class="text-sm text-danger" role="alert">{queueError}</span>
@@ -129,11 +134,11 @@
 						onclick={() => downloadRelated(track.videoId, track.album?.id ?? null)}
 						disabled={relatedState[track.videoId] === 'working'}
 						class="shrink-0 rounded-full p-2 text-ink-muted transition hover:bg-surface-3 hover:text-ink disabled:opacity-50 lg:invisible lg:group-hover:visible"
-						class:!visible={relatedState[track.videoId]}
+						class:!visible={relatedState[track.videoId] || track.isDownloaded}
 						aria-label="Download {track.title}"
-						title="Download this track"
+						title={track.isDownloaded ? 'Already downloaded' : 'Download this track'}
 					>
-						{#if relatedState[track.videoId] === 'queued'}
+						{#if relatedState[track.videoId] === 'queued' || (track.isDownloaded && !relatedState[track.videoId])}
 							<svg
 								viewBox="0 0 24 24"
 								class="h-4 w-4 text-ok"

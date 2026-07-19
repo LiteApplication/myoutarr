@@ -8,7 +8,7 @@ declare const self: ServiceWorkerGlobalScope;
 const CACHE = `cache-${version}`;
 const ASSETS = [
 	...build, // compiled JS/CSS files
-	...files  // static files
+	...files // static files
 ];
 
 self.addEventListener('install', (event) => {
@@ -66,7 +66,7 @@ self.addEventListener('fetch', (event) => {
 		} catch {
 			const cachedResponse = await cache.match(event.request);
 			if (cachedResponse) return cachedResponse;
-			
+
 			// Offline fallback for navigation requests
 			if (event.request.headers.get('accept')?.includes('text/html')) {
 				return (await cache.match('/')) || Response.error();

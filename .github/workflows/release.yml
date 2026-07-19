@@ -27,6 +27,10 @@ jobs:
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
     steps:
+      - name: Lowercase image name
+        run: |
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v7
 
       - name: Derive platform slug
@@ -78,6 +82,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Lowercase image name
+        run: |
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Download digests
         uses: actions/download-artifact@v4
         with:

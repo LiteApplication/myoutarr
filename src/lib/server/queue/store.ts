@@ -365,9 +365,11 @@ export interface LogEntry {
 	outputPath: string | null;
 	title: string;
 	artist: string;
+	videoId: string;
 	batchId: string;
 	batchTitle: string;
 	batchKind: BatchKind;
+	batchSourceId: string;
 	thumbnail: string | null;
 }
 
@@ -379,10 +381,12 @@ interface LogRow {
 	started_at: number | null;
 	finished_at: number | null;
 	output_path: string | null;
+	video_id: string;
 	meta: string;
 	batch_id: string;
 	batch_title: string;
 	batch_kind: BatchKind;
+	batch_source_id: string;
 	batch_thumbnail: string | null;
 }
 
@@ -394,9 +398,10 @@ interface LogRow {
 export function listRecentJobs(db: DB = getDb(), limit = 200): LogEntry[] {
 	const rows = db
 		.prepare(
-			`SELECT j.id, j.status, j.attempts, j.error, j.started_at, j.finished_at,
+			`SELECT j.id, j.video_id, j.status, j.attempts, j.error, j.started_at, j.finished_at,
 			        j.output_path, j.meta, j.batch_id,
-			        b.title AS batch_title, b.kind AS batch_kind, b.thumbnail AS batch_thumbnail
+			        b.title AS batch_title, b.kind AS batch_kind, b.thumbnail AS batch_thumbnail,
+			        b.source_id AS batch_source_id
 			 FROM jobs j JOIN batches b ON b.id = j.batch_id
 			 WHERE j.status IN ('completed', 'failed', 'cancelled')
 			 ORDER BY j.finished_at DESC
@@ -415,9 +420,11 @@ export function listRecentJobs(db: DB = getDb(), limit = 200): LogEntry[] {
 			outputPath: row.output_path,
 			title: meta.title ?? '(unknown)',
 			artist: meta.artist ?? '',
+			videoId: row.video_id,
 			batchId: row.batch_id,
 			batchTitle: row.batch_title,
 			batchKind: row.batch_kind,
+			batchSourceId: row.batch_source_id,
 			thumbnail: row.batch_thumbnail
 		};
 	});

@@ -1,3 +1,4 @@
+import { findCompletedDownload } from '$lib/server/queue/store';
 import { search, type SearchFilter } from '$lib/server/ytmusic/api';
 import { parseYtUrl } from '$lib/server/ytmusic/parseUrl';
 import { error, redirect } from '@sveltejs/kit';
@@ -36,10 +37,18 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	const target = urlTarget(query);
 	if (target) redirect(303, target);
-
 	try {
 		const results = await search(query, filter);
-		return { query, filter, results };
+		const resultsWithStatus = results.map((item) => {
+			if (item.kind === 'song' && item.videoId) {
+				return {
+					...item,
+					isDownloaded: findCompletedDownload(item.videoId) !== null
+				};
+			}
+			return item;
+		});
+		return { query, filter, results: resultsWithStatus };
 	} catch (cause) {
 		error(502, `Search failed: ${(cause as Error).message}`);
 	}
