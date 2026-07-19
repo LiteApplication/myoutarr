@@ -128,7 +128,7 @@
 					<button
 						onclick={() => downloadRelated(track.videoId, track.album?.id ?? null)}
 						disabled={relatedState[track.videoId] === 'working'}
-						class="shrink-0 rounded-full p-2 text-ink-muted transition hover:bg-surface-3 hover:text-ink disabled:opacity-50 sm:invisible sm:group-hover:visible"
+						class="shrink-0 rounded-full p-2 text-ink-muted transition hover:bg-surface-3 hover:text-ink disabled:opacity-50 lg:invisible lg:group-hover:visible"
 						class:!visible={relatedState[track.videoId]}
 						aria-label="Download {track.title}"
 						title="Download this track"

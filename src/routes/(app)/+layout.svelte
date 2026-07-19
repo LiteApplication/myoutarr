@@ -3,6 +3,8 @@
 	import QueueBar from '$lib/components/QueueBar.svelte';
 	import type { LayoutData } from './$types';
 	import { fade, fly } from 'svelte/transition';
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
 
@@ -13,6 +15,14 @@
 	let menuOpen = $state(false);
 	$effect(() => {
 		if (page.url.pathname) menuOpen = false;
+	});
+
+	onMount(() => {
+		if (browser && 'serviceWorker' in navigator) {
+			navigator.serviceWorker.register('/service-worker.js', {
+				type: 'module'
+			});
+		}
 	});
 
 	const navItems = [
@@ -89,7 +99,7 @@
 	{/each}
 {/snippet}
 
-<div class="flex min-h-screen bg-canvas text-ink">
+<div class="flex min-h-dvh bg-canvas text-ink">
 	<!-- Left rail -->
 	<nav
 		class="fixed inset-y-0 left-0 z-20 hidden w-rail flex-col border-r border-line bg-canvas md:flex"

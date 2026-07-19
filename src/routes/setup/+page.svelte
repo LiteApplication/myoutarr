@@ -21,7 +21,7 @@
 	<title>Setup - myoutarr</title>
 </svelte:head>
 
-<div class="flex min-h-screen items-center justify-center bg-canvas px-4">
+<div class="flex min-h-dvh items-center justify-center bg-canvas px-4">
 	<div class="w-full max-w-md rounded-2xl bg-surface p-8 shadow-xl">
 		<div class="mb-8 text-center">
 			<h1 class="text-2xl font-bold text-ink">Welcome to myoutarr</h1>

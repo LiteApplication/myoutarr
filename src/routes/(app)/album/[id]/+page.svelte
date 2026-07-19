@@ -95,7 +95,7 @@
 			{#if track.isAvailable && track.videoId}
 				<button
 					onclick={() => download(track.videoId!)}
-					class="invisible rounded-full p-2 text-ink-muted transition hover:bg-surface-3 hover:text-ink group-hover:visible"
+					class="rounded-full p-2 text-ink-muted transition hover:bg-surface-3 hover:text-ink lg:invisible lg:group-hover:visible"
 					aria-label="Download {track.title}"
 					title="Download this track"
 				>
