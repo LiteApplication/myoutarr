@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -11,6 +12,23 @@
 				}))
 			: []
 	);
+
+	// Depth of the current folder decides what its children are: artists at the
+	// root, albums one level in, tracks below that - phrasing the confirmation.
+	let childKind = $derived(
+		data.path === '' ? 'artist' : data.path.includes('/') ? 'track' : 'album'
+	);
+
+	let deleting = $state<string | null>(null);
+	let errorMsg = $state<string | null>(null);
+
+	function confirmMessage(entry: { name: string; kind: string }): string {
+		if (entry.kind === 'directory') {
+			const noun = childKind === 'artist' ? 'artist' : 'album';
+			return `Delete the ${noun} "${entry.name}" and everything inside it? This permanently removes the files and cannot be undone.`;
+		}
+		return `Delete the track "${entry.name}"? This permanently removes the file and cannot be undone.`;
+	}
 
 	function fmtSize(bytes?: number): string {
 		if (!bytes) return '';
@@ -44,6 +62,10 @@
 	</a>
 </div>
 
+{#if errorMsg}
+	<p class="mb-4 rounded-lg bg-danger/15 px-3 py-2 text-sm text-danger" role="alert">{errorMsg}</p>
+{/if}
+
 {#if data.error}
 	<p class="rounded-lg bg-danger/15 px-3 py-2 text-sm text-danger" role="alert">{data.error}</p>
 {:else if data.entries.length === 0}
@@ -71,6 +93,34 @@
 						Edit tags
 					</a>
 				{/if}
+				<form
+					method="POST"
+					action="?/delete"
+					use:enhance={({ cancel }) => {
+						if (!globalThis.confirm(confirmMessage(entry))) {
+							cancel();
+							return;
+						}
+						deleting = entry.path;
+						errorMsg = null;
+						return async ({ result, update }) => {
+							deleting = null;
+							if (result.type === 'failure') {
+								errorMsg = (result.data?.error as string) ?? 'Could not delete this item.';
+							}
+							await update();
+						};
+					}}
+				>
+					<input type="hidden" name="path" value={entry.path} />
+					<button
+						type="submit"
+						disabled={deleting === entry.path}
+						class="rounded-full px-3 py-1 text-xs text-danger transition hover:bg-danger/15 disabled:opacity-50"
+					>
+						{deleting === entry.path ? 'Deleting…' : 'Delete'}
+					</button>
+				</form>
 			</li>
 		{/each}
 	</ul>

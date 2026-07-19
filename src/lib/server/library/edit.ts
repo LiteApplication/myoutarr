@@ -117,7 +117,7 @@ export async function applyTags(
 }
 
 /** Remove now-empty directories up to (but never including) the library root. */
-function pruneEmptyDirs(from: string, root: string): void {
+export function pruneEmptyDirs(from: string, root: string): void {
 	let current = path.resolve(from);
 	const stop = path.resolve(root);
 	while (current !== stop && current.startsWith(stop)) {
