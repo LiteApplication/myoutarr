@@ -38,6 +38,16 @@
 			icon: 'M9 19V6l12-3v13M9 19a3 3 0 11-6 0 3 3 0 016 0zm12-3a3 3 0 11-6 0 3 3 0 016 0z'
 		},
 		{
+			href: '/playlist-sync',
+			label: 'Playlist Sync',
+			icon: 'M4 6h11M4 12h11M4 18h7M16 16l3 3 3-3M19 19V9'
+		},
+		{
+			href: '/recommendations',
+			label: 'Recommendations',
+			icon: 'M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4L12 3zM18 14l1 2.4L21.5 17l-2.5 1L18 20.5 17 18l-2.5-1 2.5-.6L18 14z'
+		},
+		{
 			href: '/cookies',
 			label: 'Cookies',
 			icon: 'M12 2a10 10 0 1010 10 4 4 0 01-5-5 4 4 0 01-5-5zM8.5 10.5h.01M15 14h.01M10.5 15.5h.01'

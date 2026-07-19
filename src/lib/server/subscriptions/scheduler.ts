@@ -1,3 +1,4 @@
+import { checkDuePlaylistSubscriptions } from '../playlists/check.ts';
 import { getSettings } from '../settings.ts';
 import { checkDueSubscriptions } from './check.ts';
 
@@ -15,12 +16,16 @@ let tickTimer: NodeJS.Timeout | null = null;
 let running = false;
 
 /**
- * Start the daily subscription checker. `onEnqueued` is invoked after a tick
- * that produced new batches, so the caller can poke the worker pool. Idempotent:
- * calling twice is a no-op. Ticks are serialised - a slow check never overlaps
- * the next wake.
+ * Start the daily subscription checker. `onEnqueued` is invoked with the batch
+ * ids produced by a tick, so the caller can poke the worker pool and reconcile
+ * any batch already satisfied from the library. Idempotent: calling twice is a
+ * no-op. Ticks are serialised - a slow check never overlaps the next wake.
+ *
+ * Artist auto-download honours the global `subscriptionsEnabled` switch; playlist
+ * sync is gated per-playlist (its own `enabled` flag) and always considered here.
+ * Both share the `subscriptionCheckHours` cadence.
  */
-export function startSubscriptionScheduler(onEnqueued: () => void): void {
+export function startSubscriptionScheduler(onEnqueued: (batchIds: string[]) => void): void {
 	if (tickTimer) return;
 
 	const runTick = async () => {
@@ -28,10 +33,13 @@ export function startSubscriptionScheduler(onEnqueued: () => void): void {
 		running = true;
 		try {
 			const settings = getSettings();
-			if (!settings.subscriptionsEnabled) return;
 			const intervalMs = Math.max(1, settings.subscriptionCheckHours) * 60 * 60 * 1000;
-			const result = await checkDueSubscriptions(intervalMs);
-			if (result.enqueued > 0) onEnqueued();
+			const batchIds: string[] = [];
+			if (settings.subscriptionsEnabled) {
+				batchIds.push(...(await checkDueSubscriptions(intervalMs)).batchIds);
+			}
+			batchIds.push(...(await checkDuePlaylistSubscriptions(intervalMs)).batchIds);
+			if (batchIds.length > 0) onEnqueued(batchIds);
 		} catch (cause) {
 			console.error('subscription scheduler tick failed:', (cause as Error).message);
 		} finally {

@@ -69,6 +69,74 @@ describe('JellyfinClient', () => {
 		expect(libraries.map((l) => l.name)).toEqual(['Music', 'Mixed']);
 	});
 
+	it('playlistItemIds returns the ids of items currently in the playlist', async () => {
+		const fetchImpl = mockFetch(200, { Items: [{ Id: 'a' }, { Id: 'b' }, { Id: 'c' }] });
+		const ids = await new JellyfinClient('http://jf:8096', fetchImpl).playlistItemIds(
+			't',
+			'pl-1',
+			'u1'
+		);
+		expect(ids).toEqual(['a', 'b', 'c']);
+		const calledUrl = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+		expect(calledUrl).toBe('http://jf:8096/Playlists/pl-1/Items?userId=u1');
+	});
+
+	it('prependToPlaylist adds new items and moves them to the front in order', async () => {
+		// Playlist starts with one entry; each item id carries a per-playlist entry id.
+		const entries: { Id: string; PlaylistItemId: string }[] = [{ Id: 'a', PlaylistItemId: 'pa' }];
+		let nextEntry = 0;
+		const moves: { playlistItemId: string; index: number }[] = [];
+
+		const fetchImpl = vi.fn(async (input: string, init?: RequestInit) => {
+			const url = new URL(input);
+			const method = init?.method ?? 'GET';
+			const move = url.pathname.match(/\/Playlists\/pl\/Items\/([^/]+)\/Move\/(\d+)$/);
+			if (method === 'POST' && move) {
+				moves.push({ playlistItemId: move[1], index: Number(move[2]) });
+				return new Response(null, { status: 204 });
+			}
+			if (method === 'POST' && url.pathname === '/Playlists/pl/Items') {
+				for (const id of (url.searchParams.get('ids') ?? '').split(',')) {
+					entries.push({ Id: id, PlaylistItemId: `p${id}${nextEntry++}` });
+				}
+				return new Response(null, { status: 204 });
+			}
+			// GET /Playlists/pl/Items
+			return new Response(JSON.stringify({ Items: entries }), {
+				status: 200,
+				headers: { 'content-type': 'application/json' }
+			});
+		}) as unknown as typeof fetch;
+
+		await new JellyfinClient('http://jf:8096', fetchImpl).prependToPlaylist('t', 'pl', 'u1', [
+			'x',
+			'y'
+		]);
+
+		// Both new items were moved to the front, x before y (indices 0 then 1).
+		expect(moves).toEqual([
+			{ playlistItemId: 'px0', index: 0 },
+			{ playlistItemId: 'py1', index: 1 }
+		]);
+	});
+
+	it('prependToPlaylist skips items already present', async () => {
+		const entries = [
+			{ Id: 'a', PlaylistItemId: 'pa' },
+			{ Id: 'x', PlaylistItemId: 'px' }
+		];
+		const fetchImpl = vi.fn(async (input: string, init?: RequestInit) => {
+			const method = init?.method ?? 'GET';
+			if (method === 'POST') throw new Error('should not add or move an already-present item');
+			return new Response(JSON.stringify({ Items: entries }), {
+				status: 200,
+				headers: { 'content-type': 'application/json' }
+			});
+		}) as unknown as typeof fetch;
+		// 'x' is already in the playlist, so nothing is added or moved.
+		await new JellyfinClient('http://jf:8096', fetchImpl).prependToPlaylist('t', 'pl', 'u1', ['x']);
+	});
+
 	it('wraps network failures in JellyfinError', async () => {
 		const failing = vi.fn(async () => {
 			throw new TypeError('fetch failed');

@@ -172,6 +172,20 @@
 				/>
 				<span class="text-sm text-ink"> Auto-download new releases from artists you follow </span>
 			</label>
+			<label class="mt-4 flex items-center gap-3">
+				<input
+					type="checkbox"
+					name="recommendationsEnabled"
+					checked={settings.recommendationsEnabled}
+					class="accent-accent"
+				/>
+				<span class="text-sm text-ink">
+					Grow <a href="/recommendations" class="text-ink hover:underline"
+						>recommendation playlists</a
+					>
+					daily with new songs matching their vibe
+				</span>
+			</label>
 			<label class="mt-4 block max-w-xs">
 				<span class="mb-1 block text-sm text-ink-muted">Check interval (hours, 1–168)</span>
 				<input
@@ -183,7 +197,8 @@
 					class="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-ink focus:border-accent"
 				/>
 				<span class="mt-1 block text-xs text-ink-faint">
-					How often a followed artist is polled for new releases. Manage the list on the
+					Shared cadence: how often followed artists, synced playlists, and recommendation playlists
+					are checked. Manage the list on the
 					<a href="/subscriptions" class="text-ink hover:underline">Subscriptions</a> page.
 				</span>
 			</label>

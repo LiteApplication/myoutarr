@@ -36,6 +36,8 @@ export interface Settings {
 	subscriptionsEnabled: boolean;
 	/** How often (hours) to poll a subscribed artist for new releases. */
 	subscriptionCheckHours: number;
+	/** Daily "radio" expansion of recommendation playlists. Reuses the same cadence. */
+	recommendationsEnabled: boolean;
 }
 
 export const defaults: Settings = {
@@ -52,7 +54,8 @@ export const defaults: Settings = {
 	jellyfinUrl: '',
 	jellyfinLibraryPath: '',
 	subscriptionsEnabled: true,
-	subscriptionCheckHours: 24
+	subscriptionCheckHours: 24,
+	recommendationsEnabled: true
 };
 
 export function getSettings(db: DB = getDb()): Settings {

@@ -55,12 +55,17 @@ describe('toJellyfinPath', () => {
 });
 
 describe('syncPlaylistBatch', () => {
-	function clientStub(pathToId: Record<string, string>, existingPlaylist: string | null = null) {
+	function clientStub(
+		pathToId: Record<string, string>,
+		existingPlaylist: string | null = null,
+		existingItems: string[] = []
+	) {
 		const created: { name: string; ids: string[] }[] = [];
 		const added: string[][] = [];
 		const client = {
 			findAudioByPath: vi.fn(async (_t: string, _title: string, p: string) => pathToId[p] ?? null),
 			findPlaylist: vi.fn(async () => existingPlaylist),
+			playlistItemIds: vi.fn(async () => existingItems),
 			createPlaylist: vi.fn(async (_t: string, _u: string, name: string, ids: string[]) => {
 				created.push({ name, ids });
 				return 'pl-new';
@@ -96,6 +101,50 @@ describe('syncPlaylistBatch', () => {
 		expect(added[0]).toEqual(['item-0']);
 	});
 
+	it('does not re-add tracks already in the playlist (idempotent)', async () => {
+		const batchId = seedPlaylistBatch(['completed', 'completed']);
+		process.env.MUSIC_DIR = '/music';
+		const { client, added } = clientStub(
+			{
+				'/data/music/A/B (2001)/01 - Track 0.opus': 'item-0',
+				'/data/music/A/B (2001)/02 - Track 1.opus': 'item-1'
+			},
+			'pl-existing',
+			['item-0'] // item-0 is already in the playlist
+		);
+		const result = await syncPlaylistBatch(batchId, db, { client, pollIntervalMs: 1 });
+		expect(result?.playlistId).toBe('pl-existing');
+		expect(added[0]).toEqual(['item-1']); // only the missing one
+	});
+
+	it('persists the resolved playlist id onto the batch', async () => {
+		const batchId = seedPlaylistBatch(['completed']);
+		process.env.MUSIC_DIR = '/music';
+		const { client } = clientStub({ '/data/music/A/B (2001)/01 - Track 0.opus': 'item-0' });
+		await syncPlaylistBatch(batchId, db, { client, pollIntervalMs: 1 });
+		const row = db
+			.prepare('SELECT jellyfin_playlist_id AS id FROM batches WHERE id = ?')
+			.get(batchId) as { id: string | null };
+		expect(row.id).toBe('pl-new');
+	});
+
+	it('with poll:false makes a single pass and adds only what is already scanned', async () => {
+		const batchId = seedPlaylistBatch(['completed', 'completed']);
+		process.env.MUSIC_DIR = '/music';
+		// Only the first track has been indexed by Jellyfin so far.
+		const { client, created } = clientStub({
+			'/data/music/A/B (2001)/01 - Track 0.opus': 'item-0'
+		});
+		const result = await syncPlaylistBatch(batchId, db, {
+			client,
+			pollIntervalMs: 1000,
+			poll: false
+		});
+		// A single pass, no long retry wait: only the scanned track is added.
+		expect(result).toEqual({ playlistId: 'pl-new', matched: 1, total: 2 });
+		expect(created[0].ids).toEqual(['item-0']);
+	});
+
 	it('skips failed tracks but still creates the playlist from the rest', async () => {
 		const batchId = seedPlaylistBatch(['completed', 'failed']);
 		process.env.MUSIC_DIR = '/music';
@@ -105,6 +154,38 @@ describe('syncPlaylistBatch', () => {
 		const result = await syncPlaylistBatch(batchId, db, { client, pollIntervalMs: 1 });
 		expect(result).toEqual({ playlistId: 'pl-new', matched: 1, total: 1 });
 		expect(created[0].ids).toEqual(['item-0']);
+	});
+
+	it('prepends to an existing playlist when the batch is flagged prepend', async () => {
+		process.env.MUSIC_DIR = '/music';
+		db.prepare(
+			`INSERT INTO batches (id, kind, source_id, title, created_at, created_by, prepend, jellyfin_playlist_id)
+			 VALUES ('bp', 'playlist', 'rec1', 'My Vibe', ?, 'u1', 1, 'pl-existing')`
+		).run(Date.now());
+		db.prepare(
+			`INSERT INTO jobs (id, batch_id, video_id, position, status, meta, output_path)
+			 VALUES ('jp', 'bp', 'vp', 0, 'completed', ?, '/music/A/B (2001)/01 - Track 0.opus')`
+		).run(JSON.stringify({ title: 'Track 0', artist: 'A', album: 'B' }));
+
+		const prepended: string[][] = [];
+		const added: string[][] = [];
+		const client = {
+			findAudioByPath: vi.fn(async () => 'item-0'),
+			findPlaylist: vi.fn(async () => 'pl-existing'),
+			playlistItemIds: vi.fn(async () => [] as string[]),
+			createPlaylist: vi.fn(async () => 'pl-new'),
+			addToPlaylist: vi.fn(async (_t: string, _p: string, _u: string, ids: string[]) => {
+				added.push(ids);
+			}),
+			prependToPlaylist: vi.fn(async (_t: string, _p: string, _u: string, ids: string[]) => {
+				prepended.push(ids);
+			})
+		} as unknown as JellyfinClient;
+
+		const result = await syncPlaylistBatch('bp', db, { client, pollIntervalMs: 1 });
+		expect(result?.playlistId).toBe('pl-existing');
+		expect(prepended).toEqual([['item-0']]);
+		expect(added).toEqual([]); // append path not taken for a prepend batch
 	});
 
 	it('ignores non-playlist batches', async () => {

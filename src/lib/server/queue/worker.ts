@@ -34,6 +34,8 @@ export interface WorkerPoolOptions {
 	concurrency?: () => number;
 	maxRetries?: () => number;
 	onBatchDrained?: (batchId: string) => void;
+	/** Fired each time a job reaches 'completed', before the drain check. */
+	onJobCompleted?: (batchId: string) => void;
 }
 
 export class WorkerPool {
@@ -41,6 +43,7 @@ export class WorkerPool {
 	private readonly concurrency: () => number;
 	private readonly maxRetries: () => number;
 	private readonly onBatchDrained?: (batchId: string) => void;
+	private readonly onJobCompleted?: (batchId: string) => void;
 	private readonly aborts = new Map<string, AbortController>();
 	private active = 0;
 	private stopped = false;
@@ -54,6 +57,7 @@ export class WorkerPool {
 		this.concurrency = options.concurrency ?? (() => getSettings(this.db).concurrency);
 		this.maxRetries = options.maxRetries ?? (() => getSettings(this.db).maxRetries);
 		this.onBatchDrained = options.onBatchDrained;
+		this.onJobCompleted = options.onJobCompleted;
 	}
 
 	/** Boot: requeue orphans from a previous process, then start filling slots. */
@@ -130,10 +134,23 @@ export class WorkerPool {
 		} finally {
 			this.aborts.delete(job.id);
 			this.emitJob(job.id);
+			if (getJob(job.id, this.db)?.status === 'completed') this.onJobCompleted?.(job.batchId);
 			if (batchDrained(job.batchId, this.db)) {
 				publish({ type: 'batch', payload: { id: job.batchId, drained: true } });
 				this.onBatchDrained?.(job.batchId);
 			}
+		}
+	}
+
+	/**
+	 * Fire the drain reaction for a batch that is already fully terminal without
+	 * a running job to trigger it - e.g. a playlist batch whose tracks were all
+	 * pre-completed (already in the library). Safe to call after enqueue.
+	 */
+	notifyIfDrained(batchId: string): void {
+		if (batchDrained(batchId, this.db)) {
+			publish({ type: 'batch', payload: { id: batchId, drained: true } });
+			this.onBatchDrained?.(batchId);
 		}
 	}
 

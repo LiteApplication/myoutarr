@@ -371,6 +371,22 @@ export async function getSong(
 	};
 }
 
+/**
+ * Radio recommendations for a seed video: songs YT Music considers a vibe match
+ * for it. Backs the recommendation-playlist feature. The seed's own track is
+ * dropped so callers only ever see genuinely new suggestions.
+ */
+export async function getRadio(
+	videoId: string,
+	limit = 50,
+	worker: YtMusicWorker = getYtMusic()
+): Promise<SongResult[]> {
+	const raw = await worker.call<Raw>('song_radio', { id: videoId, limit });
+	return arr(raw?.tracks)
+		.map(mapWatchTrack)
+		.filter((t): t is SongResult => t !== null && t.videoId !== videoId);
+}
+
 export async function getPlaylist(
 	browseId: string,
 	worker: YtMusicWorker = getYtMusic()

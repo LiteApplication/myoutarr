@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +11,7 @@ import {
 	completeJob,
 	createBatch,
 	failJob,
+	findCompletedDownload,
 	listQueue,
 	listRecentJobs,
 	pauseQueue,
@@ -50,6 +51,45 @@ function makeBatch(n = 3) {
 		db
 	);
 }
+
+describe('skip already-downloaded', () => {
+	it('finds a completed download by video id when its file still exists', () => {
+		const existing = path.join(dir, 'Track 0.opus');
+		writeFileSync(existing, 'x');
+		const { jobs } = makeBatch(1);
+		completeJob(jobs[0].id, existing, db);
+		expect(findCompletedDownload(jobs[0].videoId, db)).toBe(existing);
+	});
+
+	it('does not skip when the earlier file is gone', () => {
+		const { jobs } = makeBatch(1);
+		completeJob(jobs[0].id, path.join(dir, 'missing.opus'), db);
+		expect(findCompletedDownload(jobs[0].videoId, db)).toBeNull();
+		expect(findCompletedDownload('never-downloaded', db)).toBeNull();
+	});
+
+	it('inserts a pre-completed job for a track with existingPath (no re-download)', () => {
+		const existing = path.join(dir, 'have.opus');
+		writeFileSync(existing, 'x');
+		const { jobs } = createBatch(
+			{ kind: 'playlist', sourceId: 'p1', title: 'Mix', createdBy: 'u1' },
+			[
+				{
+					videoId: 'have',
+					meta: { title: 'Have', artist: 'A', album: 'B' },
+					existingPath: existing
+				},
+				{ videoId: 'need', meta: { title: 'Need', artist: 'A', album: 'B' } }
+			],
+			db
+		);
+		expect(jobs[0]).toMatchObject({ status: 'completed', progress: 1, outputPath: existing });
+		expect(jobs[1]).toMatchObject({ status: 'queued', outputPath: null });
+		// The worker only ever claims the track that still needs downloading.
+		expect(claimNextJob(db)?.videoId).toBe('need');
+		expect(claimNextJob(db)).toBeNull();
+	});
+});
 
 describe('queue store', () => {
 	it('expands a batch into ordered per-track jobs', () => {

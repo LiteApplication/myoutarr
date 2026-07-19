@@ -1,4 +1,4 @@
-import { getPool } from '$lib/server/app';
+import { getPool, reconcileDrainedBatches } from '$lib/server/app';
 import { enqueue, type EnqueueRequest } from '$lib/server/queue/enqueue';
 import { listQueue } from '$lib/server/queue/store';
 import { json } from '@sveltejs/kit';
@@ -21,6 +21,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
 		const batches = await enqueue(body, locals.session!.userId);
 		getPool().poke();
+		// Playlists fully satisfied from the library drain at creation with no job
+		// to fire the drain reaction - nudge them so the Jellyfin playlist is built.
+		reconcileDrainedBatches(batches.map((b) => b.id));
 		return json({ batches: batches.map((b) => ({ id: b.id, title: b.title })) }, { status: 201 });
 	} catch (cause) {
 		return json({ error: (cause as Error).message }, { status: 502 });

@@ -1,7 +1,16 @@
 import { building } from '$app/environment';
-import { scheduleRefresh, syncPlaylistBatch } from './jellyfin/sync.ts';
+import { getDb } from './db/index.ts';
+import {
+	scheduleIncrementalPlaylistSync,
+	scheduleRefresh,
+	syncPlaylistBatch
+} from './jellyfin/sync.ts';
 import { enrichMeta } from './musicbrainz/client.ts';
 import { WorkerPool } from './queue/worker.ts';
+import {
+	startRecommendationScheduler,
+	stopRecommendationScheduler
+} from './recommendations/scheduler.ts';
 import { getSettings } from './settings.ts';
 import {
 	startSubscriptionScheduler,
@@ -43,16 +52,37 @@ export function getPool(): WorkerPool {
 						console.error('batch-drained handler failed:', cause);
 					}
 				}
+			},
+			// As each track of a playlist lands, grow the Jellyfin playlist so it
+			// appears progressively rather than only when the whole batch drains.
+			onJobCompleted: (batchId) => {
+				const batch = getDb()
+					.prepare("SELECT id FROM batches WHERE id = ? AND kind = 'playlist'")
+					.get(batchId);
+				if (!batch) return;
+				scheduleRefresh();
+				scheduleIncrementalPlaylistSync(batchId);
 			}
 		});
 		pool.start();
 
-		// Daily check for new releases from subscribed artists; enqueued batches
-		// are picked up by poking this same pool.
-		startSubscriptionScheduler(() => pool?.poke());
+		// Daily check for new releases from subscribed artists and new songs in
+		// followed playlists; enqueued batches are picked up by poking this pool,
+		// and any batch already satisfied from the library is reconciled to drain.
+		startSubscriptionScheduler((batchIds) => {
+			pool?.poke();
+			reconcileDrainedBatches(batchIds);
+		});
+
+		// Daily radio expansion of recommendation playlists, on the same cadence.
+		startRecommendationScheduler((batchIds) => {
+			pool?.poke();
+			reconcileDrainedBatches(batchIds);
+		});
 
 		const shutdown = () => {
 			stopSubscriptionScheduler();
+			stopRecommendationScheduler();
 			void pool?.stop();
 			stopYtMusic();
 		};
@@ -60,6 +90,16 @@ export function getPool(): WorkerPool {
 		process.once('SIGINT', shutdown);
 	}
 	return pool;
+}
+
+/**
+ * Fire the drain reaction for batches that are already fully terminal right
+ * after enqueue - e.g. a playlist whose tracks were all already in the library,
+ * so the worker never runs a job to trigger the drain. Call after `enqueue`.
+ */
+export function reconcileDrainedBatches(batchIds: string[]): void {
+	const pool = getPool();
+	for (const id of batchIds) pool.notifyIfDrained(id);
 }
 
 /**
@@ -74,6 +114,7 @@ export function ensureServices(): void {
 /** Test hook. */
 export function resetApp(): void {
 	stopSubscriptionScheduler();
+	stopRecommendationScheduler();
 	pool = null;
 	batchDrainedHandlers = [];
 }

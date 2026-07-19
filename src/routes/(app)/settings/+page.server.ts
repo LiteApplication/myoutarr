@@ -31,6 +31,7 @@ export const actions: Actions = {
 		patch.musicBrainz = form.get('musicBrainz') === 'on';
 		patch.jellyfinRefresh = form.get('jellyfinRefresh') === 'on';
 		patch.subscriptionsEnabled = form.get('subscriptionsEnabled') === 'on';
+		patch.recommendationsEnabled = form.get('recommendationsEnabled') === 'on';
 		const checkHours = Number(form.get('subscriptionCheckHours'));
 		if (Number.isInteger(checkHours) && checkHours >= 1 && checkHours <= 168) {
 			patch.subscriptionCheckHours = checkHours;

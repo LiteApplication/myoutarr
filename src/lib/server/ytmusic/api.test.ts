@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getAlbum, getArtist, getPlaylist, getSong, search } from './api.ts';
+import { getAlbum, getArtist, getPlaylist, getRadio, getSong, search } from './api.ts';
 import type { YtMusicWorker } from './client.ts';
 
 /** Stub worker returning a canned payload for any call. */
@@ -151,6 +151,41 @@ describe('song mapping', () => {
 
 	it('throws when the watch queue is empty', async () => {
 		await expect(getSong('v1', stub({ tracks: [] }))).rejects.toThrow('song not found');
+	});
+});
+
+describe('radio mapping', () => {
+	it('maps watch-playlist tracks and drops the seed itself', async () => {
+		const results = await getRadio(
+			'v1',
+			50,
+			stub({
+				tracks: [
+					{
+						videoId: 'v1', // the seed → dropped
+						title: 'One More Time',
+						artists: [{ name: 'Daft Punk', id: 'a1' }],
+						length: '5:20',
+						thumbnail: [thumbnail]
+					},
+					{
+						videoId: 'v2',
+						title: 'Around the World',
+						artists: [{ name: 'Daft Punk', id: 'a1' }],
+						length: '7:09',
+						thumbnail: [thumbnail]
+					},
+					{ title: 'no video id → dropped' }
+				]
+			})
+		);
+		expect(results.map((r) => r.videoId)).toEqual(['v2']);
+		expect(results[0]).toMatchObject({ title: 'Around the World', duration: '7:09' });
+	});
+
+	it('tolerates a malformed response', async () => {
+		expect(await getRadio('v1', 50, stub(null))).toEqual([]);
+		expect(await getRadio('v1', 50, stub({ nonsense: true }))).toEqual([]);
 	});
 });
 

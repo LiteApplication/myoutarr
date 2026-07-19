@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import type { DB } from '../db/index.ts';
 import { getDb } from '../db/index.ts';
 
@@ -50,6 +51,12 @@ export interface Batch {
 export interface NewTrack {
 	videoId: string;
 	meta: JobMeta;
+	/**
+	 * When set, the track is already in the library at this path: its job is
+	 * inserted pre-completed so it isn't re-downloaded, yet still participates in
+	 * playlist sync. See `findCompletedDownload`.
+	 */
+	existingPath?: string;
 }
 
 interface JobRow {
@@ -91,6 +98,8 @@ export function createBatch(
 		artist?: string;
 		thumbnail?: string;
 		createdBy: string;
+		/** Materialise into the Jellyfin playlist by prepending, not appending. */
+		prepend?: boolean;
 	},
 	tracks: NewTrack[],
 	db: DB = getDb()
@@ -107,13 +116,19 @@ export function createBatch(
 		createdBy: input.createdBy
 	};
 	const insertBatch = db.prepare(
-		`INSERT INTO batches (id, kind, source_id, title, artist, thumbnail, created_at, created_by)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+		`INSERT INTO batches (id, kind, source_id, title, artist, thumbnail, created_at, created_by, prepend)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	);
 	const nextPosition =
 		((db.prepare('SELECT MAX(position) AS p FROM jobs').get() as { p: number | null }).p ?? -1) + 1;
 	const insertJob = db.prepare(
 		`INSERT INTO jobs (id, batch_id, video_id, position, meta) VALUES (?, ?, ?, ?, ?)`
+	);
+	// Tracks already in the library are inserted pre-completed: the worker never
+	// claims a non-'queued' job, so they are skipped rather than re-downloaded.
+	const insertDone = db.prepare(
+		`INSERT INTO jobs (id, batch_id, video_id, position, meta, status, progress, started_at, finished_at, output_path)
+		 VALUES (?, ?, ?, ?, ?, 'completed', 1, ?, ?, ?)`
 	);
 	const jobs: Job[] = [];
 	db.transaction(() => {
@@ -125,23 +140,38 @@ export function createBatch(
 			batch.artist,
 			batch.thumbnail,
 			batch.createdAt,
-			batch.createdBy
+			batch.createdBy,
+			input.prepend ? 1 : 0
 		);
 		tracks.forEach((track, index) => {
 			const id = randomUUID();
-			insertJob.run(id, batch.id, track.videoId, nextPosition + index, JSON.stringify(track.meta));
+			const position = nextPosition + index;
+			if (track.existingPath) {
+				insertDone.run(
+					id,
+					batch.id,
+					track.videoId,
+					position,
+					JSON.stringify(track.meta),
+					batch.createdAt,
+					batch.createdAt,
+					track.existingPath
+				);
+			} else {
+				insertJob.run(id, batch.id, track.videoId, position, JSON.stringify(track.meta));
+			}
 			jobs.push({
 				id,
 				batchId: batch.id,
 				videoId: track.videoId,
-				status: 'queued',
-				position: nextPosition + index,
+				status: track.existingPath ? 'completed' : 'queued',
+				position,
 				attempts: 0,
-				progress: 0,
+				progress: track.existingPath ? 1 : 0,
 				meta: track.meta,
 				error: null,
 				nextRetryAt: null,
-				outputPath: null
+				outputPath: track.existingPath ?? null
 			});
 		});
 	})();
@@ -252,6 +282,25 @@ export function recoverOrphans(db: DB = getDb()): number {
 			"UPDATE jobs SET status = 'queued', progress = 0, attempts = attempts - 1 WHERE status = 'running'"
 		)
 		.run().changes;
+}
+
+/**
+ * The library path of an already-downloaded copy of `videoId`, or null. Used to
+ * skip re-downloading a track that is already in the library: the most recent
+ * completed job for the video whose output file still exists on disk. The
+ * existence check means a deleted (or unmounted) file falls through to a fresh
+ * download rather than being wrongly skipped.
+ */
+export function findCompletedDownload(videoId: string, db: DB = getDb()): string | null {
+	const row = db
+		.prepare(
+			`SELECT output_path FROM jobs
+			 WHERE video_id = ? AND status = 'completed' AND output_path IS NOT NULL
+			 ORDER BY finished_at DESC LIMIT 1`
+		)
+		.get(videoId) as { output_path: string } | undefined;
+	if (!row) return null;
+	return existsSync(row.output_path) ? row.output_path : null;
 }
 
 export function getJob(id: string, db: DB = getDb()): Job | null {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -6,6 +7,21 @@
 	let cover = $derived(data.playlist.thumbnails.at(-1)?.url ?? '');
 	let queueState = $state<'idle' | 'working' | 'queued' | 'error'>('idle');
 	let queueError = $state('');
+	let syncBusy = $state(false);
+
+	async function toggleSync() {
+		syncBusy = true;
+		try {
+			await fetch('/api/playlists', {
+				method: data.synced ? 'DELETE' : 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ browseId: data.playlist.browseId })
+			});
+			await invalidateAll();
+		} finally {
+			syncBusy = false;
+		}
+	}
 
 	async function downloadAll() {
 		queueState = 'working';
@@ -52,6 +68,19 @@
 					: queueState === 'queued'
 						? 'Queued ✓'
 						: 'Download playlist'}
+			</button>
+			<button
+				onclick={toggleSync}
+				disabled={syncBusy}
+				class={[
+					'rounded-full border px-5 py-2 text-sm font-medium transition disabled:opacity-50',
+					data.synced
+						? 'border-accent text-accent hover:bg-surface-2'
+						: 'border-line text-ink-muted hover:bg-surface-2 hover:text-ink'
+				]}
+				title="Automatically download songs added to this playlist and keep the Jellyfin playlist in sync"
+			>
+				{syncBusy ? '…' : data.synced ? 'Syncing ✓' : 'Sync new songs'}
 			</button>
 			{#if queueState === 'error'}
 				<span class="text-sm text-danger" role="alert">{queueError}</span>

@@ -78,5 +78,61 @@ export const migrations: string[] = [
 		seen_at    INTEGER NOT NULL,              -- unix ms
 		PRIMARY KEY (browse_id, release_id)
 	) STRICT;
+	`,
+	// 3 - playlist sync: mirror an upstream playlist into a Jellyfin playlist and
+	// poll followed playlists for newly-added songs.
+	`
+	-- Remember the Jellyfin playlist a batch materialised into, so repeated syncs
+	-- extend the same playlist instead of matching by (mutable) name each time.
+	ALTER TABLE batches ADD COLUMN jellyfin_playlist_id TEXT;
+
+	CREATE TABLE playlist_subscriptions (
+		browse_id       TEXT PRIMARY KEY,          -- YT Music playlist id (VL…/PL…/OLAK5uy…)
+		title           TEXT NOT NULL,
+		thumbnail       TEXT,
+		enabled         INTEGER NOT NULL DEFAULT 1, -- per-playlist poll toggle
+		created_by      TEXT NOT NULL,             -- Jellyfin user id the downloads are attributed to
+		created_at      INTEGER NOT NULL,          -- unix ms
+		last_checked_at INTEGER                    -- unix ms; NULL until first check
+	) STRICT;
+
+	-- Video ids already accounted for, so a check only enqueues songs added after
+	-- the playlist was followed. Seeded with the current tracklist on subscribe.
+	CREATE TABLE playlist_seen (
+		browse_id  TEXT NOT NULL
+			REFERENCES playlist_subscriptions (browse_id) ON DELETE CASCADE,
+		video_id   TEXT NOT NULL,
+		seen_at    INTEGER NOT NULL,               -- unix ms
+		PRIMARY KEY (browse_id, video_id)
+	) STRICT;
+	`,
+	// 4 - recommendation playlists: a daily "radio" that prepends new songs
+	// matching a seeded playlist's evolving vibe.
+	`
+	-- Prepend flag: recommendation batches insert new tracks at the front of the
+	-- Jellyfin playlist instead of appending.
+	ALTER TABLE batches ADD COLUMN prepend INTEGER NOT NULL DEFAULT 0;
+
+	CREATE TABLE recommendation_playlists (
+		id              TEXT PRIMARY KEY,           -- generated uuid
+		name            TEXT NOT NULL,              -- Jellyfin playlist name (materialisation key)
+		daily_count     INTEGER NOT NULL DEFAULT 1, -- songs prepended per run
+		created_by      TEXT NOT NULL,              -- Jellyfin user id downloads are attributed to
+		created_at      INTEGER NOT NULL,
+		last_checked_at INTEGER                     -- unix ms; NULL until first run
+	) STRICT;
+
+	-- Every track ever in the playlist: original seeds + all recommendations. Doubles
+	-- as the radio-seed pool (sampled each run) and the dedupe/"seen" set.
+	CREATE TABLE recommendation_tracks (
+		playlist_id TEXT NOT NULL
+			REFERENCES recommendation_playlists (id) ON DELETE CASCADE,
+		video_id    TEXT NOT NULL,
+		title       TEXT NOT NULL,
+		artist      TEXT NOT NULL,
+		is_seed     INTEGER NOT NULL DEFAULT 0,     -- original seed vs recommended
+		added_at    INTEGER NOT NULL,
+		PRIMARY KEY (playlist_id, video_id)
+	) STRICT;
 	`
 ];

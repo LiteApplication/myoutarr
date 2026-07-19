@@ -6,10 +6,11 @@ import {
 	getArtistReleases,
 	getPlaylist,
 	getSong,
-	type AlbumDetail
+	type AlbumDetail,
+	type SongResult
 } from '../ytmusic/api.ts';
 import type { Batch, JobMeta, NewTrack } from './store.ts';
-import { createBatch } from './store.ts';
+import { createBatch, findCompletedDownload } from './store.ts';
 
 export type EnqueueRequest =
 	| { kind: 'song'; videoId: string; albumBrowseId?: string }
@@ -36,6 +37,34 @@ function albumTrackMeta(album: AlbumDetail): NewTrack[] {
 				albumBrowseId: album.browseId
 			} satisfies JobMeta
 		}));
+}
+
+/**
+ * Map playlist tracks to jobs, flagging any already in the library so they are
+ * skipped rather than re-downloaded (`NewTrack.existingPath`). Shared by the
+ * manual playlist download and the playlist-sync check. `playlistTitle` is the
+ * album fallback for tracks that belong to no album.
+ */
+export function buildPlaylistTracks(
+	playlistTitle: string,
+	tracks: SongResult[],
+	db: DB = getDb()
+): NewTrack[] {
+	return tracks.map((t, index) => ({
+		videoId: t.videoId,
+		existingPath: findCompletedDownload(t.videoId, db) ?? undefined,
+		meta: {
+			title: t.title,
+			artist: t.artists.map((a) => a.name).join(', ') || 'Unknown Artist',
+			// Real album metadata is resolved per-track at download time via the
+			// song's album id when present; playlist name is the fallback.
+			album: t.album?.name ?? playlistTitle,
+			albumArtist: t.artists[0]?.name,
+			thumbnail: t.thumbnails.at(-1)?.url,
+			trackNumber: index + 1,
+			albumBrowseId: t.album?.id ?? undefined
+		} satisfies JobMeta
+	}));
 }
 
 /**
@@ -142,20 +171,7 @@ export async function enqueue(
 
 		case 'playlist': {
 			const playlist = await getPlaylist(request.browseId);
-			const tracks: NewTrack[] = playlist.tracks.map((t, index) => ({
-				videoId: t.videoId,
-				meta: {
-					title: t.title,
-					artist: t.artists.map((a) => a.name).join(', ') || 'Unknown Artist',
-					// Real album metadata is resolved per-track at download time via
-					// the song's album id when present; playlist name is the fallback.
-					album: t.album?.name ?? playlist.title,
-					albumArtist: t.artists[0]?.name,
-					thumbnail: t.thumbnails.at(-1)?.url,
-					trackNumber: index + 1,
-					albumBrowseId: t.album?.id ?? undefined
-				} satisfies JobMeta
-			}));
+			const tracks = buildPlaylistTracks(playlist.title, playlist.tracks, db);
 			const { batch } = createBatch(
 				{
 					kind: 'playlist',

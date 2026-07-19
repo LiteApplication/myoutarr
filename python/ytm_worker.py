@@ -73,6 +73,18 @@ def _song_page(params):
     return {"tracks": watch.get("tracks") or []}
 
 
+def _song_radio(params):
+    """Songs similar to a seed video, as a radio-style watch playlist.
+
+    `radio=True` asks YT Music for a "vibe" mix around the seed rather than the
+    literal up-next queue, which is what the recommendation feature samples.
+    """
+    watch = ytm().get_watch_playlist(
+        params["id"], radio=True, limit=int(params.get("limit", 50))
+    )
+    return {"tracks": watch.get("tracks") or []}
+
+
 def _ping(_params):
     return "pong"
 
@@ -85,6 +97,7 @@ METHODS = {
     "get_playlist": _get_playlist,
     "get_song": _get_song,
     "song_page": _song_page,
+    "song_radio": _song_radio,
     "ping": _ping,
 }
 

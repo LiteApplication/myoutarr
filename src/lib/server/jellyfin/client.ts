@@ -186,6 +186,16 @@ export class JellyfinClient {
 		return result.Id;
 	}
 
+	/** The item ids currently in a playlist, in order. Used to dedup adds. */
+	async playlistItemIds(token: string, playlistId: string, userId: string): Promise<string[]> {
+		const result = await this.request<{ Items?: { Id: string }[] }>(
+			'GET',
+			`/Playlists/${playlistId}/Items?userId=${encodeURIComponent(userId)}`,
+			{ token }
+		);
+		return (result.Items ?? []).map((item) => item.Id);
+	}
+
 	async addToPlaylist(
 		token: string,
 		playlistId: string,
@@ -198,5 +208,80 @@ export class JellyfinClient {
 			`/Playlists/${playlistId}/Items?ids=${itemIds.join(',')}&userId=${encodeURIComponent(userId)}`,
 			{ token }
 		);
+	}
+
+	/**
+	 * The playlist's entries, in order, each carrying both the media item id
+	 * (`itemId`) and the per-playlist entry id (`playlistItemId`) needed to move
+	 * or remove that specific entry.
+	 */
+	async playlistItems(
+		token: string,
+		playlistId: string,
+		userId: string
+	): Promise<{ itemId: string; playlistItemId: string }[]> {
+		const result = await this.request<{ Items?: { Id: string; PlaylistItemId?: string }[] }>(
+			'GET',
+			`/Playlists/${playlistId}/Items?userId=${encodeURIComponent(userId)}&fields=Path`,
+			{ token }
+		);
+		return (result.Items ?? [])
+			.filter((item): item is { Id: string; PlaylistItemId: string } =>
+				Boolean(item.PlaylistItemId)
+			)
+			.map((item) => ({ itemId: item.Id, playlistItemId: item.PlaylistItemId }));
+	}
+
+	/** Move one playlist entry to a new 0-based index within the playlist. */
+	async movePlaylistItem(
+		token: string,
+		playlistId: string,
+		playlistItemId: string,
+		newIndex: number
+	): Promise<void> {
+		await this.request<void>(
+			'POST',
+			`/Playlists/${playlistId}/Items/${playlistItemId}/Move/${newIndex}`,
+			{ token }
+		);
+	}
+
+	/**
+	 * Add items to a playlist and move them to the front, preserving their given
+	 * order (item 0 ends up first). Jellyfin has no "insert at index" endpoint, so
+	 * this appends then re-fetches to learn the new entries' playlistItemIds and
+	 * moves each into place. Newly-added items not already present are prepended;
+	 * items already in the playlist are left where they are.
+	 */
+	async prependToPlaylist(
+		token: string,
+		playlistId: string,
+		userId: string,
+		itemIds: string[]
+	): Promise<void> {
+		if (itemIds.length === 0) return;
+		const before = await this.playlistItems(token, playlistId, userId);
+		const present = new Set(before.map((e) => e.itemId));
+		const toAdd = itemIds.filter((id) => !present.has(id));
+		if (toAdd.length === 0) return;
+		await this.addToPlaylist(token, playlistId, userId, toAdd);
+
+		// Re-fetch to discover the appended entries' per-playlist ids, then move
+		// each to the front in order so `toAdd[0]` becomes index 0.
+		const after = await this.playlistItems(token, playlistId, userId);
+		const beforeEntryIds = new Set(before.map((e) => e.playlistItemId));
+		const newEntryByItem = new Map<string, string>();
+		for (const entry of after) {
+			if (!beforeEntryIds.has(entry.playlistItemId) && !newEntryByItem.has(entry.itemId)) {
+				newEntryByItem.set(entry.itemId, entry.playlistItemId);
+			}
+		}
+		let index = 0;
+		for (const itemId of toAdd) {
+			const playlistItemId = newEntryByItem.get(itemId);
+			if (!playlistItemId) continue;
+			await this.movePlaylistItem(token, playlistId, playlistItemId, index);
+			index++;
+		}
 	}
 }
