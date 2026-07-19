@@ -387,6 +387,36 @@ export async function getRadio(
 		.filter((t): t is SongResult => t !== null && t.videoId !== videoId);
 }
 
+/**
+ * Fill in each song's real album via its song page when it's missing. Radio and
+ * hand-built seed songs arrive without album info, which would otherwise make
+ * them file under a fake album; resolving here lets tracks land under their real
+ * album. Best-effort and concurrency-limited: a lookup that fails leaves the
+ * song's album untouched (it then files as its own single). Songs that already
+ * carry an album are left as-is (no wasted round trip).
+ */
+export async function resolveAlbums(
+	songs: SongResult[],
+	worker: YtMusicWorker = getYtMusic()
+): Promise<SongResult[]> {
+	const CHUNK = 4;
+	const out = [...songs];
+	for (let i = 0; i < out.length; i += CHUNK) {
+		await Promise.all(
+			out.slice(i, i + CHUNK).map(async (song, j) => {
+				if (song.album?.name) return;
+				try {
+					const detail = await getSong(song.videoId, worker);
+					if (detail.album?.name) out[i + j] = { ...song, album: detail.album };
+				} catch {
+					// leave album unresolved; the track files as its own single
+				}
+			})
+		);
+	}
+	return out;
+}
+
 export async function getPlaylist(
 	browseId: string,
 	worker: YtMusicWorker = getYtMusic()

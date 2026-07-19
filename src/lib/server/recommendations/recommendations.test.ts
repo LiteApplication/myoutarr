@@ -50,6 +50,7 @@ function deps(radio: SongResult[], onRadio?: (id: string) => void): CheckDeps {
 			onRadio?.(videoId);
 			return radio;
 		},
+		resolveAlbums: async (songs) => songs,
 		buildTracks: buildPlaylistTracks,
 		createBatch
 	};
@@ -106,6 +107,33 @@ describe('expandPlaylist', () => {
 		expect(batch).toMatchObject({ prepend: 1, title: 'My Vibe', kind: 'playlist' });
 	});
 
+	it('files tracks under their resolved real album, never the playlist name', async () => {
+		const pl = playlist(2);
+		// One radio pick resolves to a real album; the other has none.
+		const withAlbum = { ...song('c'), album: null };
+		const withoutAlbum = { ...song('d'), album: null };
+		const recDeps: CheckDeps = {
+			getRadio: async () => [withAlbum, withoutAlbum],
+			resolveAlbums: async (songs) =>
+				songs.map((s) =>
+					s.videoId === 'c' ? { ...s, album: { name: 'Real Album', id: 'MPRE_c' } } : s
+				),
+			buildTracks: buildPlaylistTracks,
+			createBatch
+		};
+
+		const result = await expandPlaylist(pl, db, recDeps);
+		const metas = db
+			.prepare('SELECT meta FROM jobs WHERE batch_id = ? ORDER BY position')
+			.all(result.batchIds[0])
+			.map((r) => JSON.parse((r as { meta: string }).meta) as { album: string });
+
+		// Resolved real album is used; the album-less pick falls back to its own
+		// title (a single is its own album) - never the playlist name "My Vibe".
+		expect(metas.map((m) => m.album)).toEqual(['Real Album', 'Title d']);
+		expect(metas.some((m) => m.album === 'My Vibe')).toBe(false);
+	});
+
 	it('does not re-pick songs already in the playlist on a later run', async () => {
 		const pl = playlist(1);
 		await expandPlaylist(pl, db, deps([song('c'), song('d'), song('e')]));
@@ -139,6 +167,7 @@ describe('expandPlaylist', () => {
 				if (calls === 1) throw new Error('transient');
 				return [song('c')];
 			},
+			resolveAlbums: async (songs) => songs,
 			buildTracks: buildPlaylistTracks,
 			createBatch
 		};

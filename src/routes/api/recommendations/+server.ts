@@ -8,7 +8,7 @@ import {
 	listPlaylists,
 	trackCount
 } from '$lib/server/recommendations/store';
-import type { SongResult } from '$lib/server/ytmusic/api';
+import { resolveAlbums, type SongResult } from '$lib/server/ytmusic/api';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
@@ -82,9 +82,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const playlist = createPlaylist({ name, dailyCount, createdBy }, seeds);
 
 	// Materialise the Jellyfin playlist immediately from the seed songs (a normal
-	// append batch - order is preserved for a fresh playlist).
+	// append batch - order is preserved for a fresh playlist). The browser only
+	// sends id/title/artist, so resolve each seed's real album before filing.
 	try {
-		const tracks = buildPlaylistTracks(name, seeds.map(seedToSong));
+		const resolved = await resolveAlbums(seeds.map(seedToSong));
+		const tracks = buildPlaylistTracks(resolved);
 		const { batch } = createBatch(
 			{ kind: 'playlist', sourceId: playlist.id, title: name, createdBy },
 			tracks

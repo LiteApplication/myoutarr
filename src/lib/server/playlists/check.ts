@@ -48,7 +48,7 @@ export async function checkPlaylistSubscription(
 
 	const batchIds: string[] = [];
 	if (newTracks.length > 0) {
-		const tracks = buildPlaylistTracks(playlist.title, newTracks, db);
+		const tracks = buildPlaylistTracks(newTracks, db);
 		const { batch } = createBatch(
 			{
 				kind: 'playlist',

@@ -3,7 +3,7 @@ import { getDb } from '../db/index.ts';
 import { publish } from '../events.ts';
 import { buildPlaylistTracks } from '../queue/enqueue.ts';
 import { createBatch } from '../queue/store.ts';
-import { getRadio } from '../ytmusic/api.ts';
+import { getRadio, resolveAlbums } from '../ytmusic/api.ts';
 import type { SongResult } from '../ytmusic/api.ts';
 import {
 	addTracks,
@@ -30,11 +30,17 @@ export interface ExpandResult {
  */
 export interface CheckDeps {
 	getRadio: typeof getRadio;
+	resolveAlbums: typeof resolveAlbums;
 	buildTracks: typeof buildPlaylistTracks;
 	createBatch: typeof createBatch;
 }
 
-const defaultDeps: CheckDeps = { getRadio, buildTracks: buildPlaylistTracks, createBatch };
+const defaultDeps: CheckDeps = {
+	getRadio,
+	resolveAlbums,
+	buildTracks: buildPlaylistTracks,
+	createBatch
+};
 
 /** Round-robin interleave of per-seed candidate lists, for vibe diversity. */
 function interleave(lists: SongResult[][]): SongResult[] {
@@ -101,7 +107,10 @@ export async function expandPlaylist(
 		db
 	);
 
-	const tracks = deps.buildTracks(pl.name, chosen, db);
+	// Radio picks arrive without album info; resolve real albums so tracks file
+	// under them rather than as loose singles or a fake playlist-named album.
+	const resolved = await deps.resolveAlbums(chosen);
+	const tracks = deps.buildTracks(resolved, db);
 	const { batch } = deps.createBatch(
 		{
 			kind: 'playlist',

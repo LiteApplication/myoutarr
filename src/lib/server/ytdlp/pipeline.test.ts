@@ -12,7 +12,9 @@ import { YtdlpPipeline } from './runner.ts';
 const HERE = import.meta.dirname;
 const PROJECT = path.resolve(HERE, '../../../..');
 const PYTHON = path.join(PROJECT, '.venv/bin/python');
-const FIXTURE = path.join(tmpdir(), 'myoutarr-fixture.opus');
+// Per-file fixture path: test files run in parallel workers, so a shared name
+// would let one worker read the fixture while another is mid-ffmpeg-write.
+const FIXTURE = path.join(tmpdir(), 'myoutarr-fixture-pipeline.opus');
 
 // Wrapper so the pipeline can spawn "yt-dlp" as a single binary path.
 let fakeBin: string;

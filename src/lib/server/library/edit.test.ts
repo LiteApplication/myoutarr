@@ -11,7 +11,9 @@ const PROJECT = path.resolve(import.meta.dirname, '../../../..');
 const PYTHON = path.join(PROJECT, '.venv/bin/python');
 const TAG_SCRIPT = path.join(PROJECT, 'python/tag.py');
 const READ_SCRIPT = path.join(PROJECT, 'python/read_tags.py');
-const FIXTURE = path.join(tmpdir(), 'myoutarr-fixture.opus');
+// Per-file fixture path: test files run in parallel workers, so a shared name
+// would let one worker read the fixture while another is mid-ffmpeg-write.
+const FIXTURE = path.join(tmpdir(), 'myoutarr-fixture-edit.opus');
 
 beforeAll(() => {
 	if (!existsSync(FIXTURE)) {
