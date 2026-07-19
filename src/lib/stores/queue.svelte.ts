@@ -17,6 +17,8 @@ export interface QueueBatch {
 	artist: string | null;
 	thumbnail: string | null;
 	createdAt: number;
+	/** Set once the batch has been materialised into a Jellyfin playlist. */
+	jellyfinPlaylistId: string | null;
 	jobs: QueueJob[];
 }
 

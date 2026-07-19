@@ -321,6 +321,8 @@ export function getJobOwner(jobId: string, db: DB = getDb()): string | null {
 }
 
 export interface BatchWithJobs extends Batch {
+	/** The Jellyfin playlist this batch materialised into, or null if not yet synced. */
+	jellyfinPlaylistId: string | null;
 	jobs: Job[];
 }
 
@@ -336,6 +338,7 @@ export function listQueue(db: DB = getDb(), limit = 50): BatchWithJobs[] {
 		thumbnail: string | null;
 		created_at: number;
 		created_by: string;
+		jellyfin_playlist_id: string | null;
 	}[];
 	const jobsFor = db.prepare('SELECT * FROM jobs WHERE batch_id = ? ORDER BY position');
 	return batches.map((b) => ({
@@ -347,6 +350,7 @@ export function listQueue(db: DB = getDb(), limit = 50): BatchWithJobs[] {
 		thumbnail: b.thumbnail,
 		createdAt: b.created_at,
 		createdBy: b.created_by,
+		jellyfinPlaylistId: b.jellyfin_playlist_id,
 		jobs: (jobsFor.all(b.id) as JobRow[]).map(rowToJob)
 	}));
 }

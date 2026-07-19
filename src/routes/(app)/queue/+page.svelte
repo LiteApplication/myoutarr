@@ -57,6 +57,31 @@
 						{batch.artist ?? ''} · {batch.kind} · {done.length}/{batch.jobs.length} done
 					</p>
 				</div>
+				{#if batch.kind === 'playlist'}
+					{#if batch.jellyfinPlaylistId}
+						<span
+							class="flex shrink-0 items-center gap-1.5 rounded-full bg-ok/10 px-2.5 py-1 text-xs font-medium text-ok"
+							title="Materialised into a Jellyfin playlist"
+						>
+							<svg viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+								<path
+									fill-rule="evenodd"
+									d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 0 1 1.4-1.4l3.8 3.79 6.8-6.8a1 1 0 0 1 1.4 0Z"
+									clip-rule="evenodd"
+								/>
+							</svg>
+							Synced to Jellyfin
+						</span>
+					{:else}
+						<span
+							class="flex shrink-0 items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-xs text-ink-muted"
+							title="Not yet synced to Jellyfin"
+						>
+							<span class="h-1.5 w-1.5 rounded-full bg-ink-faint"></span>
+							Not synced
+						</span>
+					{/if}
+				{/if}
 				{#if open.length > 0}
 					<button
 						onclick={() => queue.action('cancel', { batchId: batch.id })}
