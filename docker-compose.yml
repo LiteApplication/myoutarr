@@ -11,6 +11,9 @@ services:
       PGID: '1000'
       TZ: Europe/Paris
       YTDLP_AUTO_UPDATE: 'false'
+      # Ephemeral download scratch on the tmpfs mount below - keeps high-churn
+      # yt-dlp I/O off the config volume.
+      SCRATCH_DIR: '/scratch'
       # PO Token provider: lets yt-dlp's web/web_music clients serve audio again
       # (fixes "Requested format is not available"). Points at the sibling
       # service below. Remove it (and the service) to disable.
@@ -18,6 +21,11 @@ services:
     volumes:
       - ./config:/config
       - /path/to/your/music:/music
+      # ephemeral scratch in RAM - never persisted. Bump size for higher concurrency.
+      - type: tmpfs
+        target: /scratch
+        tmpfs:
+          size: 536870912 # 512 MiB
     restart: unless-stopped
     depends_on:
       - bgutil-provider

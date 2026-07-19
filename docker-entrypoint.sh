@@ -14,11 +14,30 @@ if [ "$(id -u)" = "0" ]; then
 		useradd -o -u "$PUID" -g "$PGID" -d /config -s /bin/sh myoutarr
 	fi
 
-	mkdir -p /config/scratch
-	chown -R "$PUID:$PGID" /config
+	# Scratch is ephemeral tmpfs (SCRATCH_DIR), not under /config - nothing to create here.
+	#
+	# Best-effort chown: on NFS with root_squash the container's root is mapped to
+	# an unprivileged user and cannot chown files it doesn't own. That's fine as
+	# long as the app user can already write /config (ownership usually already
+	# matches PUID). So don't let chown failure abort the entrypoint - probe for
+	# actual write access below and only bail if that fails.
+	if ! chown -R "$PUID:$PGID" /config 2> /dev/null; then
+		echo "note: could not chown /config (expected on root_squash NFS); verifying write access instead"
+	fi
 	# /music is a shared volume - only ensure top-level access, never recurse
 	# (a recursive chown over a large Gluster library would be brutal).
 	chown "$PUID:$PGID" /music 2> /dev/null || true
+
+	# The chown may be a no-op or may have failed; what actually matters is that
+	# the app user can write /config. Probe by writing a real file (access() can
+	# lie over NFS, and a read-only export would pass a bare permission check).
+	probe="/config/.write-probe.$$"
+	if ! su-exec "$PUID:$PGID" sh -c "touch '$probe' && rm -f '$probe'" 2> /dev/null; then
+		echo "FATAL: /config is not writable by ${PUID}:${PGID}." >&2
+		echo "  Fix directory ownership/permissions, or map the NFS export to that uid" >&2
+		echo "  (e.g. anonuid=${PUID},anongid=${PGID}, or no_root_squash)." >&2
+		exit 1
+	fi
 
 	# Optional: refresh yt-dlp without a rebuild (YouTube breaks it regularly).
 	if [ "${YTDLP_AUTO_UPDATE:-false}" = "true" ]; then

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import type { DB } from '../db/index.ts';
 import { getDb } from '../db/index.ts';
-import { musicDir, potProviderBaseUrl, scratchDir, ytdlpJsRuntimes } from '../env.ts';
+import { configDir, musicDir, potProviderBaseUrl, scratchDir, ytdlpJsRuntimes } from '../env.ts';
 import { renderTemplate, resolveLibraryPath } from '../library/naming.ts';
 import { albumNfo, artistNfo } from '../library/nfo.ts';
 import { publishFile, writeSidecar } from '../library/publish.ts';
@@ -94,8 +94,9 @@ export class YtdlpPipeline implements JobRunner {
 		signal: AbortSignal
 	): Promise<void> {
 		const settings = getSettings(this.db);
-		const cookiesRoot =
-			this.options.cookiesRoot ?? path.dirname(this.options.scratchRoot ?? scratchDir());
+		// Cookies live under CONFIG_DIR, independent of where scratch is (scratch
+		// is now tmpfs, so its parent is no longer /config).
+		const cookiesRoot = this.options.cookiesRoot ?? configDir();
 		const owner = getJobOwner(job.id, this.db);
 		const args = buildYtdlpArgs({
 			videoId: job.videoId,

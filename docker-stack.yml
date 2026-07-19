@@ -25,15 +25,24 @@ services:
       PGID: '1000'
       TZ: Europe/Paris
       YTDLP_AUTO_UPDATE: 'false'
+      # Ephemeral download scratch on the tmpfs mount below - keeps high-churn
+      # yt-dlp I/O off both the DB volume and any network storage.
+      SCRATCH_DIR: '/scratch'
       # PO Token provider (fixes "Requested format is not available"). Reaches the
       # stateless bgutil-provider service below over the stack's overlay network;
       # that service is unconstrained and may run on any node.
       POT_PROVIDER_BASE_URL: 'http://bgutil-provider:4416'
     volumes:
-      # node-local: SQLite (WAL) + download scratch - must not be on Gluster
+      # node-local: SQLite (WAL) + per-account cookies - must not be on Gluster
       - /opt/myoutarr/config:/config
       # the shared library on the GlusterFS FUSE mountpoint
       - /mnt/gluster/music:/music
+      # ephemeral scratch in RAM - never persisted, never on network storage.
+      # Bump size if you raise download concurrency or expect large files.
+      - type: tmpfs
+        target: /scratch
+        tmpfs:
+          size: 536870912 # 512 MiB
     stop_grace_period: 60s # let in-flight downloads abort and requeue cleanly
     healthcheck:
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8687/api/health']

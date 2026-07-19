@@ -15,8 +15,14 @@ let instance: DB | null = null;
 export function openDatabase(file: string): DB {
 	mkdirSync(path.dirname(file), { recursive: true });
 	const db = new Database(file);
-	// WAL is safe here because /config is documented as node-local storage -
-	// it must never live on GlusterFS/NFS (shared-memory mmap breaks there).
+	// EXCLUSIVE locking must be set BEFORE the first WAL operation: it makes
+	// SQLite keep the wal-index in heap memory instead of an mmap'd -shm file.
+	// That is what lets WAL run safely on GlusterFS/NFS, where shared-memory
+	// mmap is not coherent - and it lines up with the single-owner invariant
+	// (replicas: 1). The exclusive lock means only this one process can open
+	// the DB; a stray second instance fails to open rather than racing the
+	// job queue. /config is still best kept node-local for latency/mount safety.
+	db.pragma('locking_mode = EXCLUSIVE');
 	db.pragma('journal_mode = WAL');
 	db.pragma('synchronous = NORMAL');
 	db.pragma('foreign_keys = ON');

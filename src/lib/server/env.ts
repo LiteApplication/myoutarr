@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 /**
@@ -25,8 +26,17 @@ export function musicDir(): string {
 	return path.resolve(process.env.MUSIC_DIR ?? '/music');
 }
 
+/**
+ * Ephemeral download scratch. Deliberately NOT under CONFIG_DIR: it must stay
+ * off network storage (NFS/Gluster) - it is throwaway, high-churn I/O and only
+ * ever touched by this single process. Defaults to a per-boot dir under the OS
+ * temp dir (honours TMPDIR, so a tmpfs mount just works); override with
+ * SCRATCH_DIR. publish.ts copies out of here into staging, so scratch living on
+ * a different filesystem than /music is expected and safe.
+ */
 export function scratchDir(): string {
-	return path.join(configDir(), 'scratch');
+	const override = process.env.SCRATCH_DIR?.trim();
+	return override ? path.resolve(override) : path.join(os.tmpdir(), 'myoutarr-scratch');
 }
 
 /** Staging lives inside the music volume so the final rename is intra-filesystem (atomic). */
