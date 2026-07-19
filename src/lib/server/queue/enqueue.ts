@@ -113,14 +113,22 @@ export async function enqueue(
 			// the song's own metadata for standalone tracks that belong to no album.
 			let track: NewTrack | undefined;
 			if (request.albumBrowseId) {
-				const album = await getAlbum(request.albumBrowseId);
-				track = albumTrackMeta(album).find((t) => t.videoId === request.videoId);
-				if (!track) throw new Error('track not found on its album (may be unavailable)');
-			} else {
+				try {
+					const album = await getAlbum(request.albumBrowseId);
+					track = albumTrackMeta(album).find((t) => t.videoId === request.videoId);
+				} catch {
+					// Fall back to song details on fetch/lookup failure
+				}
+			}
+			if (!track) {
 				const song = await getSong(request.videoId);
 				if (song.album?.id) {
-					const album = await getAlbum(song.album.id);
-					track = albumTrackMeta(album).find((t) => t.videoId === request.videoId);
+					try {
+						const album = await getAlbum(song.album.id);
+						track = albumTrackMeta(album).find((t) => t.videoId === request.videoId);
+					} catch {
+						// Fall back to song's own metadata
+					}
 				}
 				track ??= {
 					videoId: request.videoId,
