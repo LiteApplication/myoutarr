@@ -16,28 +16,36 @@ RUN npx svelte-kit sync && npm run build && npm prune --omit=dev
 # ---------- runtime stage ----------
 FROM node:26-alpine
 
+# Layers below are ordered slow/stable -> fast/churny and split so a bump to one
+# dependency doesn't invalidate the others. pip cache mounts survive across local
+# rebuilds; gha layer caching reuses each unchanged layer across CI runs.
+
 # ffmpeg for extraction/embedding; dumb-init for signal forwarding and zombie
 # reaping (we spawn yt-dlp/ffmpeg/python children); su-exec for PUID/PGID drop.
-RUN apk add --no-cache ffmpeg python3 py3-pip dumb-init su-exec shadow \
-	&& python3 -m venv /opt/venv \
-	# yt-dlp[default] pulls the yt-dlp-ejs challenge-solver scripts; YouTube's
-	# signature/"n" challenge is solved by the Node runtime this image already
-	# ships (see YTDLP_JS_RUNTIMES below). Without both, yt-dlp discards every
-	# real format and fails with "Requested format is not available".
-	&& /opt/venv/bin/pip install --no-cache-dir 'yt-dlp[default]' ytmusicapi mutagen \
-	# bgutil PO Token provider plugin: yt-dlp auto-uses it to fetch GVS PO
-	# Tokens from the bgutil-provider server (see docker-compose.yml), so the
-	# web/web_music clients can serve audio. Keep this version in lockstep with
-	# the brainicism/bgutil-ytdlp-pot-provider image tag in the compose files.
-	&& /opt/venv/bin/pip install --no-cache-dir 'bgutil-ytdlp-pot-provider==1.3.1'
+RUN apk add --no-cache ffmpeg python3 py3-pip dumb-init su-exec shadow
+
+RUN python3 -m venv /opt/venv
+
+# yt-dlp[default] pulls the yt-dlp-ejs challenge-solver scripts; YouTube's
+# signature/"n" challenge is solved by the Node runtime this image already ships
+# (see YTDLP_JS_RUNTIMES below). Without both, yt-dlp discards every real format
+# and fails with "Requested format is not available".
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+	/opt/venv/bin/pip install 'yt-dlp[default]' ytmusicapi mutagen
+
+# bgutil PO Token provider plugin: yt-dlp auto-uses it to fetch GVS PO Tokens
+# from the bgutil-provider server (see docker-compose.yml), so the web/web_music
+# clients can serve audio. Keep this version in lockstep with the
+# brainicism/bgutil-ytdlp-pot-provider image tag in the compose files.
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+	/opt/venv/bin/pip install 'bgutil-ytdlp-pot-provider==1.3.1'
 
 WORKDIR /app
 COPY --from=build /app/build ./build
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY python ./python
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 ENV NODE_ENV=production \
 	PORT=8687 \
