@@ -88,6 +88,14 @@ interface RgLookupResponse {
 	genres?: { name: string; count: number }[];
 }
 
+interface RgReleasesResponse {
+	releases?: { id: string }[];
+}
+
+interface ReleaseRecordingsResponse {
+	media?: { tracks?: { position: number; title: string }[] }[];
+}
+
 /**
  * Find the best release-group match for an artist+album pair.
  * Returns null rather than guessing when confidence is low.
@@ -155,8 +163,56 @@ function capitalize(value: string): string {
 }
 
 /**
+ * Find the real track number for a title within a release-group, by scanning
+ * the tracklist of one of its releases. Used when the caller has no reliable
+ * track number of its own (e.g. a track sourced from a playlist, where the
+ * playlist position is not the album track number). Returns null - never a
+ * guess - when no release or matching track title can be found.
+ */
+export async function findTrackNumber(
+	releaseGroupId: string,
+	title: string,
+	db: DB = getDb(),
+	fetchImpl: typeof fetch = fetch
+): Promise<number | null> {
+	const key = `track:${releaseGroupId}|${normalize(title)}`;
+	const cached = cacheGet<{ trackNumber: number } | { miss: true }>(key, db);
+	if (cached) return 'miss' in cached ? null : cached.trackNumber;
+
+	const releaseId = await mbFetch<RgReleasesResponse>(
+		`/release-group/${releaseGroupId}?inc=releases&fmt=json`,
+		fetchImpl
+	)
+		.then((r) => r.releases?.[0]?.id)
+		.catch(() => undefined);
+
+	if (!releaseId) {
+		cachePut(key, { miss: true }, db);
+		return null;
+	}
+
+	const release = await mbFetch<ReleaseRecordingsResponse>(
+		`/release/${releaseId}?inc=recordings&fmt=json`,
+		fetchImpl
+	).catch(() => null);
+
+	const wantTitle = normalize(title);
+	for (const medium of release?.media ?? []) {
+		const track = medium.tracks?.find((t) => normalize(t.title) === wantTitle);
+		if (track) {
+			cachePut(key, { trackNumber: track.position }, db);
+			return track.position;
+		}
+	}
+
+	cachePut(key, { miss: true }, db);
+	return null;
+}
+
+/**
  * Enrichment hook for the download pipeline. Fills genre, canonical year and
- * MBIDs; any failure degrades to the original YT Music metadata.
+ * MBIDs, plus the track number when the caller didn't already know a real one;
+ * any failure degrades to the original YT Music metadata.
  */
 export async function enrichMeta(
 	meta: JobMeta,
@@ -166,12 +222,17 @@ export async function enrichMeta(
 	try {
 		const match = await findRelease(meta.albumArtist ?? meta.artist, meta.album, db, fetchImpl);
 		if (!match) return meta;
+		const trackNumber =
+			meta.trackNumber ??
+			(await findTrackNumber(match.releaseGroupId, meta.title, db, fetchImpl).catch(() => null)) ??
+			undefined;
 		return {
 			...meta,
 			genre: meta.genre ?? match.genres[0],
 			year: meta.year ?? match.year,
 			mbArtistId: match.artistId,
-			mbReleaseGroupId: match.releaseGroupId
+			mbReleaseGroupId: match.releaseGroupId,
+			trackNumber
 		};
 	} catch {
 		return meta;

@@ -49,9 +49,14 @@ function albumTrackMeta(album: AlbumDetail): NewTrack[] {
  * unrelated tracks into a fake playlist-named album is exactly what we avoid.
  * Callers that source album-less tracks (recommendations) should run them
  * through `resolveAlbums` first so real albums survive this mapping.
+ *
+ * A playlist's position is not a track number - it reflects playlist order, not
+ * the track's place on its album. Leave `trackNumber` unset here; MusicBrainz
+ * enrichment (see `musicbrainz/client.ts`) fills in the real number when it can
+ * find one, and tagging simply omits the field otherwise.
  */
 export function buildPlaylistTracks(tracks: SongResult[], db: DB = getDb()): NewTrack[] {
-	return tracks.map((t, index) => ({
+	return tracks.map((t) => ({
 		videoId: t.videoId,
 		existingPath: findCompletedDownload(t.videoId, db) ?? undefined,
 		meta: {
@@ -60,7 +65,6 @@ export function buildPlaylistTracks(tracks: SongResult[], db: DB = getDb()): New
 			album: t.album?.name || t.title,
 			albumArtist: t.artists[0]?.name,
 			thumbnail: t.thumbnails.at(-1)?.url,
-			trackNumber: index + 1,
 			albumBrowseId: t.album?.id ?? undefined
 		} satisfies JobMeta
 	}));
