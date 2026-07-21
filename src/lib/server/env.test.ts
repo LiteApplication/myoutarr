@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readSecret, requireAdmin, stagingDir } from './env.ts';
+import { appVersion, readSecret, requireAdmin, stagingDir } from './env.ts';
 
 const saved: Record<string, string | undefined> = {};
 
@@ -60,5 +60,17 @@ describe('paths and flags', () => {
 		expect(requireAdmin()).toBe(false);
 		setEnv('REQUIRE_ADMIN', '0');
 		expect(requireAdmin()).toBe(true); // only the literal string "false" disables
+	});
+});
+
+describe('appVersion', () => {
+	it('returns undefined when unset (local/dev builds)', () => {
+		setEnv('APP_VERSION', undefined);
+		expect(appVersion()).toBeUndefined();
+	});
+
+	it('returns the trimmed tag baked in at Docker build time', () => {
+		setEnv('APP_VERSION', ' v1.2.3 ');
+		expect(appVersion()).toBe('v1.2.3');
 	});
 });

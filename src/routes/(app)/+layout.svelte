@@ -99,6 +99,19 @@
 	{/each}
 {/snippet}
 
+{#snippet versionLink()}
+	{#if data.appVersion}
+		<a
+			href="https://github.com/LiteApplication/myoutarr/releases/tag/{data.appVersion}"
+			target="_blank"
+			rel="noreferrer"
+			class="mt-2 block truncate px-2 text-xs text-ink-faint hover:text-ink-muted hover:underline"
+		>
+			{data.appVersion}
+		</a>
+	{/if}
+{/snippet}
+
 <div class="flex min-h-dvh bg-canvas text-ink">
 	<!-- Left rail -->
 	<nav
@@ -123,6 +136,7 @@
 			>
 				Sign out
 			</button>
+			{@render versionLink()}
 		</form>
 	</nav>
 
@@ -232,6 +246,7 @@
 				>
 					Sign out
 				</button>
+				{@render versionLink()}
 			</form>
 		</nav>
 	</div>

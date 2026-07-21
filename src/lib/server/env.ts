@@ -67,3 +67,13 @@ export function ytdlpJsRuntimes(): string | undefined {
 export function requireAdmin(): boolean {
 	return (process.env.REQUIRE_ADMIN ?? 'true').toLowerCase() !== 'false';
 }
+
+/**
+ * Git tag this build was released from (e.g. "v1.2.3"), baked into the image
+ * as APP_VERSION at Docker build time (see release.yml). Empty for local/dev
+ * runs, where there's no tag to show.
+ */
+export function appVersion(): string | undefined {
+	const value = process.env.APP_VERSION?.trim();
+	return value ? value : undefined;
+}

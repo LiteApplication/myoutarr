@@ -16,6 +16,10 @@ RUN npx svelte-kit sync && npm run build && npm prune --omit=dev
 # ---------- runtime stage ----------
 FROM node:26-alpine
 
+# Git tag this image was built from (e.g. v1.2.3), shown in the web UI. Set via
+# --build-arg from release.yml; empty for local/dev builds.
+ARG APP_VERSION=
+
 # Layers below are ordered slow/stable -> fast/churny and split so a bump to one
 # dependency doesn't invalidate the others. pip cache mounts survive across local
 # rebuilds; gha layer caching reuses each unchanged layer across CI runs.
@@ -48,6 +52,7 @@ COPY python ./python
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 ENV NODE_ENV=production \
+	APP_VERSION=${APP_VERSION} \
 	PORT=8687 \
 	CONFIG_DIR=/config \
 	MUSIC_DIR=/music \
