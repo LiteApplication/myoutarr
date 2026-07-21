@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { SvelteSet } from 'svelte/reactivity';
 
 export interface QueueJob {
 	id: string;
@@ -29,6 +30,11 @@ class QueueStore {
 	private source: EventSource | null = null;
 	private retryDelay = 1000;
 
+	/** Job ids present before the current queue session started; excluded from session progress. */
+	private baselineJobIds = new Set<string>();
+	/** Job ids that have entered the queue since it was last empty. */
+	private sessionJobIds = new SvelteSet<string>();
+
 	get activeJobs(): QueueJob[] {
 		return this.batches.flatMap((b) => b.jobs.filter((j) => j.status === 'running'));
 	}
@@ -41,12 +47,42 @@ class QueueStore {
 		);
 	}
 
+	private get allJobs(): QueueJob[] {
+		return this.batches.flatMap((b) => b.jobs);
+	}
+
+	/** Fraction (0..1) of the current session's jobs completed, or null if idle. */
+	get sessionProgress(): number | null {
+		if (this.sessionJobIds.size === 0) return null;
+		let sum = 0;
+		for (const job of this.allJobs) {
+			if (!this.sessionJobIds.has(job.id)) continue;
+			if (job.status === 'running') sum += job.progress;
+			else if (job.status !== 'queued' && job.status !== 'paused') sum += 1;
+		}
+		return sum / this.sessionJobIds.size;
+	}
+
+	private syncSession(): void {
+		if (this.openCount === 0) {
+			// Idle: fold everything currently loaded into the baseline so the next
+			// batch of jobs starts a fresh session at 0%.
+			this.baselineJobIds = new Set(this.allJobs.map((j) => j.id));
+			this.sessionJobIds.clear();
+			return;
+		}
+		for (const job of this.allJobs) {
+			if (!this.baselineJobIds.has(job.id)) this.sessionJobIds.add(job.id);
+		}
+	}
+
 	async refresh(): Promise<void> {
 		const response = await fetch('/api/queue');
 		if (response.ok) {
 			const data = (await response.json()) as { batches: QueueBatch[] };
 			this.batches = data.batches;
 		}
+		this.syncSession();
 	}
 
 	connect(): void {
@@ -77,6 +113,7 @@ class QueueStore {
 				}
 			}
 			if (structural) void this.refresh();
+			else this.syncSession();
 		});
 		this.source.addEventListener('queue', () => void this.refresh());
 		this.source.addEventListener('batch', () => void this.refresh());

@@ -6,6 +6,7 @@
 
 	let current = $derived(queue.activeJobs[0] ?? null);
 	let open = $derived(queue.openCount);
+	let progress = $derived(queue.sessionProgress ?? current?.progress ?? 0);
 </script>
 
 {#if current || open > 0}
@@ -26,12 +27,20 @@
 					<div class="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-3">
 						<div
 							class="h-full rounded-full bg-accent transition-[width] duration-300"
-							style="width: {Math.round(current.progress * 100)}%"
+							style="width: {Math.round(progress * 100)}%"
 						></div>
 					</div>
 				</div>
 			{:else}
-				<div class="min-w-0 flex-1 text-sm text-ink-muted">Queue idle</div>
+				<div class="min-w-0 flex-1">
+					<p class="text-sm text-ink-muted">Queue idle</p>
+					<div class="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-3">
+						<div
+							class="h-full rounded-full bg-accent transition-[width] duration-300"
+							style="width: {Math.round(progress * 100)}%"
+						></div>
+					</div>
+				</div>
 			{/if}
 			<span class="shrink-0 rounded-full bg-counter-soft px-3 py-1 text-xs text-ink">
 				{open} in queue
