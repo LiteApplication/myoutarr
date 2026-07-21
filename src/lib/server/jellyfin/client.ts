@@ -198,7 +198,7 @@ export class JellyfinClient {
 	): Promise<string> {
 		const result = await this.request<{ Id?: string }>('POST', '/Playlists', {
 			token,
-			body: { Name: name, UserId: userId, Ids: itemIds, MediaType: 'Audio' }
+			body: { Name: name, UserId: userId, Ids: itemIds, MediaType: 'Audio', IsPublic: false }
 		});
 		if (!result.Id) throw new JellyfinError('playlist creation returned no id');
 		return result.Id;
