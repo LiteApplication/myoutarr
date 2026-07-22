@@ -207,4 +207,15 @@ describe('playlist mapping', () => {
 		expect(playlist.tracks).toHaveLength(1);
 		expect(playlist.author).toBe('someone');
 	});
+
+	it('turns a worker failure into a friendly unavailable message', async () => {
+		const worker = {
+			call: async () => {
+				throw new Error("KeyError: 'tracks'");
+			}
+		} as unknown as YtMusicWorker;
+		await expect(getPlaylist('VL1', worker)).rejects.toThrow(
+			'This playlist is private, deleted, or unavailable.'
+		);
+	});
 });

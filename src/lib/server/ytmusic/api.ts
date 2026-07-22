@@ -421,7 +421,13 @@ export async function getPlaylist(
 	browseId: string,
 	worker: YtMusicWorker = getYtMusic()
 ): Promise<PlaylistDetail> {
-	const raw = await worker.call<Raw>('get_playlist', { id: browseId, limit: 500 });
+	let raw: Raw;
+	try {
+		raw = await worker.call<Raw>('get_playlist', { id: browseId, limit: 500 });
+	} catch (cause) {
+		console.error(`getPlaylist(${browseId}) failed:`, (cause as Error).message);
+		throw new Error('This playlist is private, deleted, or unavailable.', { cause });
+	}
 	const author = raw.author as Raw | undefined;
 	const tracks = arr(raw.tracks)
 		.map((t): SongResult | null => {

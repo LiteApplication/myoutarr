@@ -1,10 +1,8 @@
 <script lang="ts">
-	import { page } from '$app/state';
+	import { navigating, page } from '$app/state';
 	import QueueBar from '$lib/components/QueueBar.svelte';
 	import type { LayoutData } from './$types';
 	import { fade, fly } from 'svelte/transition';
-	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
 
@@ -17,13 +15,7 @@
 		if (page.url.pathname) menuOpen = false;
 	});
 
-	onMount(() => {
-		if (browser && 'serviceWorker' in globalThis.navigator) {
-			globalThis.navigator.serviceWorker.register('/service-worker.js', {
-				type: 'module'
-			});
-		}
-	});
+	let isSearching = $derived(navigating.to?.url.pathname === '/search');
 
 	const navItems = [
 		{ href: '/', label: 'Home', icon: 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10' },
@@ -112,6 +104,12 @@
 	{/if}
 {/snippet}
 
+{#if navigating.to}
+	<div class="fixed inset-x-0 top-0 z-50 h-0.5 overflow-hidden bg-accent/20">
+		<div class="loading-bar h-full w-1/3 bg-accent"></div>
+	</div>
+{/if}
+
 <div class="flex min-h-dvh bg-canvas text-ink">
 	<!-- Left rail -->
 	<nav
@@ -165,16 +163,29 @@
 			</button>
 			<form action="/search" method="GET" class="mx-auto w-full max-w-xl">
 				<div class="relative">
-					<svg
-						viewBox="0 0 24 24"
-						class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-faint"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-					>
-						<circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
-					</svg>
+					{#if isSearching}
+						<svg
+							viewBox="0 0 24 24"
+							class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin text-ink-faint"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+						>
+							<path d="M11 4a7 7 0 100 14" opacity="0.9" />
+						</svg>
+					{:else}
+						<svg
+							viewBox="0 0 24 24"
+							class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-faint"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+						>
+							<circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+						</svg>
+					{/if}
 					<input
 						name="q"
 						type="search"
@@ -253,3 +264,21 @@
 {/if}
 
 <QueueBar />
+
+<style>
+	.loading-bar {
+		animation: loading-bar-slide 1.1s ease-in-out infinite;
+	}
+
+	@keyframes loading-bar-slide {
+		0% {
+			transform: translateX(-100%);
+		}
+		50% {
+			transform: translateX(100%);
+		}
+		100% {
+			transform: translateX(250%);
+		}
+	}
+</style>

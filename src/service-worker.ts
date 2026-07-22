@@ -15,6 +15,7 @@ self.addEventListener('install', (event) => {
 	async function addFilesToCache() {
 		const cache = await caches.open(CACHE);
 		await cache.addAll(ASSETS);
+		await self.skipWaiting();
 	}
 
 	event.waitUntil(addFilesToCache());
@@ -27,6 +28,7 @@ self.addEventListener('activate', (event) => {
 				await caches.delete(key);
 			}
 		}
+		await self.clients.claim();
 	}
 
 	event.waitUntil(deleteOldCaches());
