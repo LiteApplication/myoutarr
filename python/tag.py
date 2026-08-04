@@ -7,6 +7,9 @@ Metadata keys (all optional except title/artist/album):
   title, artist, album, albumartist, date, genre, tracknumber, totaltracks,
   discnumber, mb_artist_id, mb_album_id, mb_releasegroup_id, cover (path to image)
 
+artist and albumartist accept a list; each entry is written as its own tag
+value so Jellyfin sees separate artists instead of one combined name.
+
 Exits non-zero with a message on stderr on failure.
 """
 
@@ -20,6 +23,19 @@ from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4, MP4Cover
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
+
+
+# Fields whose every value is kept; everything else is single-valued.
+MULTI_VALUE = ("artist", "albumartist")
+
+
+def values(meta, key):
+    """Metadata value as a list of non-empty strings (scalars accepted)."""
+    value = meta.get(key)
+    if value is None:
+        return []
+    items = value if isinstance(value, list) else [value]
+    return [str(item) for item in items if str(item)]
 
 
 def read_cover(path):
@@ -43,8 +59,9 @@ def tag_vorbis_like(audio, meta):
         "mb_releasegroup_id": "musicbrainz_releasegroupid",
     }
     for src, dst in mapping.items():
-        if meta.get(src):
-            audio[dst] = str(meta[src])
+        found = values(meta, src)
+        if found:
+            audio[dst] = found if src in MULTI_VALUE else found[0]
     if meta.get("tracknumber"):
         audio["tracknumber"] = str(meta["tracknumber"])
         if meta.get("totaltracks"):
@@ -76,10 +93,10 @@ def tag_mp3(path, meta):
     tags: ID3 = audio.tags
     if meta.get("title"):
         tags.setall("TIT2", [TIT2(encoding=3, text=meta["title"])])
-    if meta.get("artist"):
-        tags.setall("TPE1", [TPE1(encoding=3, text=meta["artist"])])
-    if meta.get("albumartist"):
-        tags.setall("TPE2", [TPE2(encoding=3, text=meta["albumartist"])])
+    if values(meta, "artist"):
+        tags.setall("TPE1", [TPE1(encoding=3, text=values(meta, "artist"))])
+    if values(meta, "albumartist"):
+        tags.setall("TPE2", [TPE2(encoding=3, text=values(meta, "albumartist"))])
     if meta.get("album"):
         tags.setall("TALB", [TALB(encoding=3, text=meta["album"])])
     if meta.get("date"):
@@ -119,8 +136,9 @@ def tag_mp4(path, meta):
         "genre": "\xa9gen",
     }
     for src, dst in text.items():
-        if meta.get(src):
-            audio[dst] = [str(meta[src])]
+        found = values(meta, src)
+        if found:
+            audio[dst] = found if src in MULTI_VALUE else found[:1]
     if meta.get("tracknumber"):
         audio["trkn"] = [(int(meta["tracknumber"]), int(meta.get("totaltracks") or 0))]
     if meta.get("discnumber"):

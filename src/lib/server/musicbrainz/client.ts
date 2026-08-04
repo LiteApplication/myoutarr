@@ -1,5 +1,6 @@
 import type { DB } from '../db/index.ts';
 import { getDb } from '../db/index.ts';
+import { splitArtists } from '../library/artists.ts';
 import type { JobMeta } from '../queue/store.ts';
 
 const MB_BASE = 'https://musicbrainz.org/ws/2';
@@ -74,13 +75,19 @@ export interface MbMatch {
 	score: number;
 }
 
+interface ArtistCredit {
+	name: string;
+	joinphrase?: string;
+	artist?: { id: string; name: string };
+}
+
 interface RgSearchResponse {
 	'release-groups'?: {
 		id: string;
 		score: number;
 		title: string;
 		'first-release-date'?: string;
-		'artist-credit'?: { name: string; artist?: { id: string; name: string } }[];
+		'artist-credit'?: ArtistCredit[];
 	}[];
 }
 
@@ -158,6 +165,128 @@ export async function findRelease(
 	return match;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Artist credits.                                                             */
+/*                                                                             */
+/* MusicBrainz models a credit as a *list* of artists, which is exactly what   */
+/* Jellyfin wants and what YT Music only gives us as one string ("A, B & C").  */
+/* So we take MB's list when we can get it, and fall back to whatever the      */
+/* caller already knew otherwise.                                              */
+/* -------------------------------------------------------------------------- */
+
+/** "A", " & ", "B" → "A & B" - MusicBrainz's own rendering of a credit. */
+function renderCredit(credits: ArtistCredit[]): string {
+	return credits.map((c) => `${c.name}${c.joinphrase ?? ''}`).join('');
+}
+
+function creditNames(credits: ArtistCredit[]): string[] {
+	return credits.map((c) => c.artist?.name ?? c.name).filter((name) => name !== '');
+}
+
+/**
+ * Does an MB credit plausibly describe the same act as the credit we already
+ * have? Titles collide constantly ("Alive", "Greatest Hits"), so this is the
+ * guard that stops us pinning someone else's artists onto our track.
+ *
+ * Accepted: the same rendering modulo punctuation ("A, B" vs "A & B"); every MB
+ * artist already named in our string (MB simply splits what YT ran together);
+ * or the lead artist agreeing, which lets MB *add* the featured guests YT Music
+ * left out. Anything else is treated as a different piece of music.
+ */
+function creditCorresponds(ours: string, credits: ArtistCredit[]): boolean {
+	if (credits.length === 0) return false;
+	const want = normalize(ours);
+	if (want === '') return false;
+	if (normalize(renderCredit(credits)) === want) return true;
+
+	const padded = ` ${want} `;
+	const names = creditNames(credits)
+		.map(normalize)
+		.filter((name) => name !== '');
+	if (names.length === 0) return false; // a nameless credit tells us nothing
+	if (names.every((name) => padded.includes(` ${name} `))) return true;
+
+	const ourLead = normalize(splitArtists(ours)[0] ?? '');
+	return ourLead !== '' && names[0] === ourLead;
+}
+
+interface RecordingSearchResponse {
+	recordings?: {
+		score: number;
+		title: string;
+		'artist-credit'?: ArtistCredit[];
+	}[];
+}
+
+/**
+ * The artists MusicBrainz credits for one song. Searches recordings (where
+ * per-track credits actually live, unlike the release group) constrained to the
+ * album, then keeps the first hit whose title and credit both correspond.
+ * Returns null when nothing corresponds - the caller keeps its own answer.
+ */
+export async function lookupSongArtists(
+	title: string,
+	album: string,
+	credit: string,
+	db: DB = getDb(),
+	fetchImpl: typeof fetch = fetch
+): Promise<string[] | null> {
+	const key = `credit:rec:${normalize(title)}|${normalize(album)}|${normalize(credit)}`;
+	const cached = cacheGet<string[] | { miss: true }>(key, db);
+	if (cached) return 'miss' in cached ? null : cached;
+
+	const query = encodeURIComponent(`recording:"${title}" AND release:"${album}"`);
+	const search = await mbFetch<RecordingSearchResponse>(
+		`/recording/?query=${query}&limit=10&fmt=json`,
+		fetchImpl
+	);
+
+	const wantTitle = normalize(title);
+	const found = (search.recordings ?? [])
+		.filter((rec) => rec.score >= MIN_SCORE && normalize(rec.title) === wantTitle)
+		.map((rec) => rec['artist-credit'] ?? [])
+		.find((credits) => creditCorresponds(credit, credits));
+
+	// An empty list would blank the artist tag - treat it as no answer at all.
+	const names = found && creditNames(found).length > 0 ? creditNames(found) : null;
+	cachePut(key, names ?? { miss: true }, db);
+	return names;
+}
+
+/**
+ * The artists MusicBrainz credits for one album, under the same correspondence
+ * rule as `lookupSongArtists`. Returns null when nothing corresponds.
+ */
+export async function lookupAlbumArtists(
+	album: string,
+	credit: string,
+	db: DB = getDb(),
+	fetchImpl: typeof fetch = fetch
+): Promise<string[] | null> {
+	const key = `credit:rg:${normalize(album)}|${normalize(credit)}`;
+	const cached = cacheGet<string[] | { miss: true }>(key, db);
+	if (cached) return 'miss' in cached ? null : cached;
+
+	const query = encodeURIComponent(
+		`releasegroup:"${album}" AND artist:"${splitArtists(credit)[0] ?? credit}"`
+	);
+	const search = await mbFetch<RgSearchResponse>(
+		`/release-group/?query=${query}&limit=10&fmt=json`,
+		fetchImpl
+	);
+
+	const wantTitle = normalize(album);
+	const found = (search['release-groups'] ?? [])
+		.filter((rg) => rg.score >= MIN_SCORE && normalize(rg.title) === wantTitle)
+		.map((rg) => rg['artist-credit'] ?? [])
+		.find((credits) => creditCorresponds(credit, credits));
+
+	// An empty list would blank the artist tag - treat it as no answer at all.
+	const names = found && creditNames(found).length > 0 ? creditNames(found) : null;
+	cachePut(key, names ?? { miss: true }, db);
+	return names;
+}
+
 function capitalize(value: string): string {
 	return value.replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -211,14 +340,18 @@ export async function findTrackNumber(
 
 /**
  * Enrichment hook for the download pipeline. Fills genre, canonical year and
- * MBIDs, plus the track number when the caller didn't already know a real one;
- * any failure degrades to the original YT Music metadata.
+ * MBIDs, splits combined artist credits it can verify, plus the track number
+ * when the caller didn't already know a real one; any failure degrades to the
+ * original YT Music metadata.
  */
 export async function enrichMeta(
 	meta: JobMeta,
 	db: DB = getDb(),
 	fetchImpl: typeof fetch = fetch
 ): Promise<JobMeta> {
+	// Independent of the release-group match below, and worth doing even when
+	// that lookup comes up empty.
+	meta = await resolveMetaArtists(meta, db, fetchImpl);
 	try {
 		const match = await findRelease(meta.albumArtist ?? meta.artist, meta.album, db, fetchImpl);
 		if (!match) return meta;
@@ -237,4 +370,29 @@ export async function enrichMeta(
 	} catch {
 		return meta;
 	}
+}
+
+/**
+ * Fill `artists` / `albumArtists` with MusicBrainz's own credit lists, which
+ * beat YT Music's: MB models each artist separately, spells them canonically,
+ * and knows the featured guests YT Music folds into one string. What YT Music
+ * gave us is the fallback - used whenever MB has nothing that corresponds, and
+ * as the reference the correspondence check compares against, so a same-titled
+ * song by someone else can never overwrite the credits.
+ */
+async function resolveMetaArtists(
+	meta: JobMeta,
+	db: DB,
+	fetchImpl: typeof fetch
+): Promise<JobMeta> {
+	const albumCredit = meta.albumArtist ?? meta.artist;
+	const song = await lookupSongArtists(meta.title, meta.album, meta.artist, db, fetchImpl).catch(
+		() => null
+	);
+	const album = await lookupAlbumArtists(meta.album, albumCredit, db, fetchImpl).catch(() => null);
+	return {
+		...meta,
+		artists: song ?? meta.artists ?? [meta.artist],
+		albumArtists: album ?? meta.albumArtists ?? [albumCredit]
+	};
 }

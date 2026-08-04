@@ -95,6 +95,24 @@ describe('nfo generation', () => {
 		expect(xml).not.toMatch(/<Deluxe>/);
 	});
 
+	it('lists each credited artist separately, and only when they are known', () => {
+		const collab = albumNfo({
+			title: 'Watch the Throne',
+			albumArtist: 'Jay-Z, Kanye West',
+			albumArtists: ['Jay-Z', 'Kanye West'],
+			tracks: []
+		});
+		expect(collab).toContain('<artist>Jay-Z</artist>');
+		expect(collab).toContain('<artist>Kanye West</artist>');
+		expect(collab).toContain('<albumartist>Kanye West</albumartist>');
+
+		// Without a verified list the combined credit stays one element - an
+		// unsplit name beats inventing artists that never existed.
+		const single = albumNfo({ title: 'Gratitude', albumArtist: 'Earth, Wind & Fire', tracks: [] });
+		expect(single).toContain('<artist>Earth, Wind &amp; Fire</artist>');
+		expect(single.match(/<artist>/g)).toHaveLength(1);
+	});
+
 	it('emits MBIDs and genres when present', () => {
 		const xml = albumNfo({
 			title: 'T',

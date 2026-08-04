@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDatabase, type DB } from '../db/index.ts';
-import { enrichMeta, findRelease } from './client.ts';
+import { enrichMeta, findRelease, lookupAlbumArtists, lookupSongArtists } from './client.ts';
 
 let dir: string;
 let db: DB;
@@ -95,6 +95,95 @@ describe('findRelease', () => {
 	});
 });
 
+describe('artist credits', () => {
+	/** MusicBrainz renders a collaboration as several credits joined by phrases. */
+	const recording = (title: string, credits: { name: string; joinphrase?: string }[]) => ({
+		recordings: [
+			{
+				score: 100,
+				title,
+				'artist-credit': credits.map((c) => ({
+					name: c.name,
+					joinphrase: c.joinphrase,
+					artist: { id: `ar-${c.name}`, name: c.name }
+				}))
+			}
+		]
+	});
+
+	it('splits a combined credit into the artists MusicBrainz credits', async () => {
+		const fetchImpl = fetchStub({
+			'/recording/?query=': recording('Get Lucky', [
+				{ name: 'Daft Punk', joinphrase: ' feat. ' },
+				{ name: 'Pharrell Williams' }
+			])
+		});
+		expect(
+			await lookupSongArtists('Get Lucky', 'Random Access Memories', 'Daft Punk', db, fetchImpl)
+		).toEqual(['Daft Punk', 'Pharrell Williams']);
+	});
+
+	it('prefers MusicBrainz spelling over the combined string', async () => {
+		const fetchImpl = fetchStub({
+			'/recording/?query=': recording('Sunday', [
+				{ name: 'Beyoncé', joinphrase: ' & ' },
+				{ name: 'Jay-Z' }
+			])
+		});
+		expect(await lookupSongArtists('Sunday', 'Live', 'Beyonce, Jay Z', db, fetchImpl)).toEqual([
+			'Beyoncé',
+			'Jay-Z'
+		]);
+	});
+
+	it('keeps a one-artist act whole even though its name reads like a list', async () => {
+		// "Earth, Wind & Fire" is one artist in MusicBrainz - the naive split of
+		// the string would invent two artists that never existed.
+		const fetchImpl = fetchStub({
+			'/recording/?query=': recording('September', [{ name: 'Earth, Wind & Fire' }])
+		});
+		expect(
+			await lookupSongArtists('September', 'The Best Of', 'Earth, Wind & Fire', db, fetchImpl)
+		).toEqual(['Earth, Wind & Fire']);
+	});
+
+	it('refuses a same-titled song by unrelated artists', async () => {
+		const fetchImpl = fetchStub({
+			'/recording/?query=': recording('Alive', [{ name: 'Pearl Jam' }])
+		});
+		expect(await lookupSongArtists('Alive', 'Alive', 'Sia, Adele', db, fetchImpl)).toBeNull();
+	});
+
+	it('returns null and caches the miss when nothing matches', async () => {
+		const fetchImpl = fetchStub({ '/recording/?query=': { recordings: [] } });
+		expect(await lookupSongArtists('Nothing', 'Nowhere', 'A, B', db, fetchImpl)).toBeNull();
+		const before = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls.length;
+		expect(await lookupSongArtists('Nothing', 'Nowhere', 'A, B', db, fetchImpl)).toBeNull();
+		expect((fetchImpl as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before);
+	});
+
+	it('reads album credits from the release group', async () => {
+		const fetchImpl = fetchStub({
+			'/release-group/?query=': {
+				'release-groups': [
+					{
+						id: 'rg-2',
+						score: 100,
+						title: 'Watch the Throne',
+						'artist-credit': [
+							{ name: 'Jay-Z', joinphrase: ' & ', artist: { id: 'ar-2', name: 'Jay-Z' } },
+							{ name: 'Kanye West', artist: { id: 'ar-3', name: 'Kanye West' } }
+						]
+					}
+				]
+			}
+		});
+		expect(
+			await lookupAlbumArtists('Watch the Throne', 'Jay-Z, Kanye West', db, fetchImpl)
+		).toEqual(['Jay-Z', 'Kanye West']);
+	});
+});
+
 describe('enrichMeta', () => {
 	const meta = {
 		title: 'One More Time',
@@ -120,6 +209,12 @@ describe('enrichMeta', () => {
 		const failing = vi.fn(async () => {
 			throw new Error('offline');
 		}) as unknown as typeof fetch;
-		expect(await enrichMeta(meta, db, failing)).toEqual(meta);
+		// Unreachable MusicBrainz leaves every field as it was; the credit lists
+		// simply restate the combined credit rather than guessing at a split.
+		expect(await enrichMeta(meta, db, failing)).toEqual({
+			...meta,
+			artists: ['Daft Punk'],
+			albumArtists: ['Daft Punk']
+		});
 	});
 });

@@ -15,6 +15,13 @@ def first(value):
     return str(value) if value else None
 
 
+def joined(value):
+    """Multi-valued artist tags come back as one editable ", "-joined string."""
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value if str(v)) or None
+    return str(value) if value else None
+
+
 def main():
     audio = MutagenFile(sys.argv[1])
     if audio is None:
@@ -25,11 +32,12 @@ def main():
     if isinstance(audio, MP3):
         id3 = audio.tags or {}
         get = lambda k: str(id3[k].text[0]) if k in id3 and id3[k].text else None  # noqa: E731
+        get_all = lambda k: joined(list(id3[k].text)) if k in id3 else None  # noqa: E731
         track = get("TRCK")
         tags = {
             "title": get("TIT2"),
-            "artist": get("TPE1"),
-            "albumartist": get("TPE2"),
+            "artist": get_all("TPE1"),
+            "albumartist": get_all("TPE2"),
             "album": get("TALB"),
             "date": get("TDRC"),
             "genre": get("TCON"),
@@ -40,8 +48,8 @@ def main():
         trkn = m.get("trkn")
         tags = {
             "title": first(m.get("\xa9nam")),
-            "artist": first(m.get("\xa9ART")),
-            "albumartist": first(m.get("aART")),
+            "artist": joined(m.get("\xa9ART")),
+            "albumartist": joined(m.get("aART")),
             "album": first(m.get("\xa9alb")),
             "date": first(m.get("\xa9day")),
             "genre": first(m.get("\xa9gen")),
@@ -51,8 +59,8 @@ def main():
         m = audio.tags or {}
         tags = {
             "title": first(m.get("title")),
-            "artist": first(m.get("artist")),
-            "albumartist": first(m.get("albumartist")),
+            "artist": joined(m.get("artist")),
+            "albumartist": joined(m.get("albumartist")),
             "album": first(m.get("album")),
             "date": first(m.get("date")),
             "genre": first(m.get("genre")),

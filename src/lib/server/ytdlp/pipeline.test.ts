@@ -87,7 +87,8 @@ function seedAlbum() {
 				videoId: 'IluRBvnYMoY',
 				meta: {
 					title: 'One More Time',
-					artist: 'Daft Punk',
+					artist: 'Daft Punk, Romanthony',
+					artists: ['Daft Punk', 'Romanthony'],
 					album: 'Discovery',
 					albumArtist: 'Daft Punk',
 					year: '2001',
@@ -143,9 +144,13 @@ describe('full pipeline', () => {
 			'-c',
 			`from mutagen.oggopus import OggOpus; a = OggOpus(${JSON.stringify(
 				path.join(albumDir, '01 - One More Time.opus')
-			)}); print(a['title'][0], '|', a['album'][0], '|', a['date'][0], '|', a['tracknumber'][0])`
+			)}); print(a['title'][0], '|', a['album'][0], '|', a['date'][0], '|', a['tracknumber'][0], '|', '+'.join(a['artist']), '|', '+'.join(a['albumartist']))`
 		]).toString();
-		expect(probe.trim()).toBe('One More Time | Discovery | 2001 | 1');
+		// Each credited artist is its own tag value, so Jellyfin lists them
+		// separately; the album artist stays the single act that owns the folder.
+		expect(probe.trim()).toBe(
+			'One More Time | Discovery | 2001 | 1 | Daft Punk+Romanthony | Daft Punk'
+		);
 
 		// Scratch and staging fully cleaned.
 		expect(existsSync(path.join(staging, jobs[0].id))).toBe(false);

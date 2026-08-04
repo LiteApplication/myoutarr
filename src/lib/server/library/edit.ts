@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { musicDir } from '../env.ts';
+import { lookupAlbumArtists, lookupSongArtists } from '../musicbrainz/client.ts';
 import type { JobMeta } from '../queue/store.ts';
 import { getSettings } from '../settings.ts';
 import { renderTemplate, resolveLibraryPath } from './naming.ts';
@@ -12,6 +13,49 @@ import { assertMounted } from './publish.ts';
 import { safeLibraryPath } from './browse.ts';
 
 const execFileAsync = promisify(execFile);
+
+/** How long a save waits on MusicBrainz before tagging the credit as typed. */
+const CREDIT_LOOKUP_BUDGET_MS = 6_000;
+
+export interface Credits {
+	artists: string[];
+	albumArtists: string[];
+}
+
+/** The credit exactly as typed, kept as one artist. The fallback everywhere. */
+export function typedCredits(tags: EditableTags): Credits {
+	return { artists: [tags.artist], albumArtists: [tags.albumArtist ?? tags.artist] };
+}
+
+/**
+ * MusicBrainz's credit lists for the edited track, so a "A, B"-style artist
+ * field becomes separate Jellyfin artists - but only when MB has music that
+ * corresponds (see `musicbrainz/client.ts`). Unlike the download pipeline this
+ * runs while a user waits on a form submit, so it gives up quickly and tags the
+ * typed string as one artist rather than hanging on a slow MusicBrainz.
+ */
+export async function lookupCredits(tags: EditableTags): Promise<Credits> {
+	const albumCredit = tags.albumArtist ?? tags.artist;
+	const typed = typedCredits(tags);
+
+	const lookup = async (): Promise<Credits> => ({
+		artists: (await lookupSongArtists(tags.title, tags.album, tags.artist)) ?? typed.artists,
+		albumArtists: (await lookupAlbumArtists(tags.album, albumCredit)) ?? typed.albumArtists
+	});
+
+	let timer: NodeJS.Timeout | undefined;
+	const budget = new Promise<Credits>((resolve) => {
+		timer = setTimeout(() => resolve(typed), CREDIT_LOOKUP_BUDGET_MS);
+		timer.unref();
+	});
+	try {
+		return await Promise.race([lookup(), budget]);
+	} catch {
+		return typed;
+	} finally {
+		clearTimeout(timer);
+	}
+}
 
 export interface EditableTags {
 	title: string;
@@ -31,7 +75,13 @@ export interface EditableTags {
 export async function applyTags(
 	relative: string,
 	tags: EditableTags,
-	options: { root?: string; pythonBin?: string; tagScript?: string } = {}
+	options: {
+		root?: string;
+		pythonBin?: string;
+		tagScript?: string;
+		/** Credit resolver; defaults to asking MusicBrainz. Injected by tests. */
+		resolveCredits?: (tags: EditableTags) => Promise<Credits> | Credits;
+	} = {}
 ): Promise<{ newPath: string }> {
 	const root = options.root ?? musicDir();
 	assertMounted(root);
@@ -39,14 +89,15 @@ export async function applyTags(
 	if (!existsSync(absolute)) throw new Error('file not found in library');
 
 	// 1. Retag in place via mutagen.
+	const credits = await (options.resolveCredits ?? lookupCredits)(tags);
 	const metaFile = path.join(tmpdir(), `myoutarr-edit-${Date.now()}.json`);
 	writeFileSync(
 		metaFile,
 		JSON.stringify({
 			title: tags.title,
-			artist: tags.artist,
+			artist: credits.artists,
 			album: tags.album,
-			albumartist: tags.albumArtist ?? tags.artist,
+			albumartist: credits.albumArtists,
 			date: tags.year,
 			genre: tags.genre,
 			tracknumber: tags.trackNumber
@@ -97,6 +148,7 @@ export async function applyTags(
 		albumNfo({
 			title: tags.album,
 			albumArtist: tags.albumArtist ?? tags.artist,
+			albumArtists: credits.albumArtists,
 			year: tags.year,
 			genres: tags.genre ? [tags.genre] : [],
 			tracks: siblingTracks
@@ -151,7 +203,13 @@ export async function ingestUpload(
 	fileName: string,
 	data: Buffer,
 	tags: EditableTags,
-	options: { root?: string; pythonBin?: string; tagScript?: string } = {}
+	options: {
+		root?: string;
+		pythonBin?: string;
+		tagScript?: string;
+		/** Credit resolver; defaults to asking MusicBrainz. Injected by tests. */
+		resolveCredits?: (tags: EditableTags) => Promise<Credits> | Credits;
+	} = {}
 ): Promise<{ newPath: string }> {
 	const root = options.root ?? musicDir();
 	assertMounted(root);

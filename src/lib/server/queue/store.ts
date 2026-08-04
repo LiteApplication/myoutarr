@@ -11,6 +11,15 @@ export interface JobMeta {
 	artist: string;
 	album: string;
 	albumArtist?: string;
+	/**
+	 * The individual artists behind `artist` / `albumArtist`, once they are known
+	 * to really be separate people - either because YT Music handed us a list, or
+	 * because MusicBrainz confirmed the split (see `musicbrainz/client.ts`).
+	 * Absent means "not verified": tagging then writes the combined credit as one
+	 * value rather than guessing at "Earth, Wind & Fire".
+	 */
+	artists?: string[];
+	albumArtists?: string[];
 	year?: string;
 	genre?: string;
 	trackNumber?: number;

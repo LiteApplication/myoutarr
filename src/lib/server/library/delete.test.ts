@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { beforeAll, beforeEach, afterEach, describe, expect, it } from 'vitest';
 import { deleteLibraryEntry } from './delete.ts';
-import { ingestUpload } from './edit.ts';
+import { ingestUpload, typedCredits } from './edit.ts';
 import { createSentinel } from './publish.ts';
 
 const PROJECT = path.resolve(import.meta.dirname, '../../../..');
@@ -48,7 +48,8 @@ async function seed(tags: { title: string; artist: string; album: string; trackN
 	const { newPath } = await ingestUpload('song.opus', readFileSync(FIXTURE), tags, {
 		root,
 		pythonBin: PYTHON,
-		tagScript: TAG_SCRIPT
+		tagScript: TAG_SCRIPT,
+		resolveCredits: typedCredits // keep the suite offline
 	});
 	return newPath;
 }

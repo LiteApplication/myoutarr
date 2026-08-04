@@ -16,6 +16,8 @@ function tag(name: string, value: string | undefined | null): string {
 export interface AlbumNfoInput {
 	title: string;
 	albumArtist: string;
+	/** Credited artists individually, when they are known separately. */
+	albumArtists?: string[];
 	year?: string;
 	genres?: string[];
 	mbAlbumId?: string;
@@ -26,8 +28,10 @@ export interface AlbumNfoInput {
 export function albumNfo(input: AlbumNfoInput): string {
 	let xml = '<?xml version="1.0" encoding="utf-8" standalone="yes"?>\n<album>\n';
 	xml += tag('title', input.title);
-	xml += tag('artist', input.albumArtist);
-	xml += tag('albumartist', input.albumArtist);
+	// One element per credited artist so Jellyfin links each of them.
+	const albumArtists = input.albumArtists?.length ? input.albumArtists : [input.albumArtist];
+	for (const artist of albumArtists) xml += tag('artist', artist);
+	for (const artist of albumArtists) xml += tag('albumartist', artist);
 	xml += tag('year', input.year);
 	for (const genre of input.genres ?? []) xml += tag('genre', genre);
 	xml += tag('musicbrainzalbumid', input.mbAlbumId);

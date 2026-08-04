@@ -18,6 +18,11 @@ export type EnqueueRequest =
 	| { kind: 'playlist'; browseId: string; syncJellyfin?: boolean }
 	| { kind: 'artist'; browseId: string };
 
+/** YT Music's already-separated credits, or undefined when it listed none. */
+function names(artists: { name: string }[]): string[] | undefined {
+	return artists.length > 0 ? artists.map((a) => a.name) : undefined;
+}
+
 function albumTrackMeta(album: AlbumDetail): NewTrack[] {
 	const albumArtist = album.artists[0]?.name ?? 'Unknown Artist';
 	const thumbnail = album.thumbnails.at(-1)?.url;
@@ -30,6 +35,9 @@ function albumTrackMeta(album: AlbumDetail): NewTrack[] {
 				artist: t.artists.map((a) => a.name).join(', ') || albumArtist,
 				album: album.title,
 				albumArtist,
+				// YT Music already separates the credits - no need to re-derive them.
+				artists: names(t.artists) ?? names(album.artists),
+				albumArtists: names(album.artists),
 				year: album.year ?? undefined,
 				trackNumber: t.trackNumber,
 				totalTracks: album.trackCount,
@@ -64,6 +72,8 @@ export function buildPlaylistTracks(tracks: SongResult[], db: DB = getDb()): New
 			artist: t.artists.map((a) => a.name).join(', ') || 'Unknown Artist',
 			album: t.album?.name || t.title,
 			albumArtist: t.artists[0]?.name,
+			artists: names(t.artists),
+			albumArtists: names(t.artists),
 			thumbnail: t.thumbnails.at(-1)?.url,
 			albumBrowseId: t.album?.id ?? undefined
 		} satisfies JobMeta
@@ -141,6 +151,8 @@ export async function enqueue(
 						artist: song.artists.map((a) => a.name).join(', ') || 'Unknown Artist',
 						album: song.album?.name || song.title,
 						albumArtist: song.artists[0]?.name,
+						artists: names(song.artists),
+						albumArtists: names(song.artists),
 						thumbnail: song.thumbnails.at(-1)?.url
 					}
 				};

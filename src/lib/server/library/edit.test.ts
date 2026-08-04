@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { listLibrary, readTags, safeLibraryPath } from './browse.ts';
-import { applyTags, ingestUpload } from './edit.ts';
+import { applyTags, ingestUpload, typedCredits } from './edit.ts';
 import { createSentinel } from './publish.ts';
 
 const PROJECT = path.resolve(import.meta.dirname, '../../../..');
@@ -62,7 +62,7 @@ describe('upload → edit round trip', () => {
 			'my song.opus',
 			data,
 			{ title: 'Home Recording', artist: 'Alexis', album: 'Demos', year: '2026', trackNumber: 1 },
-			{ root, pythonBin: PYTHON, tagScript: TAG_SCRIPT }
+			{ root, pythonBin: PYTHON, tagScript: TAG_SCRIPT, resolveCredits: typedCredits }
 		);
 		expect(result.newPath).toBe('Alexis/Demos (2026)/01 - Home Recording.opus');
 		expect(existsSync(path.join(root, result.newPath))).toBe(true);
@@ -70,6 +70,42 @@ describe('upload → edit round trip', () => {
 
 		const tags = await readTags(result.newPath, { root, pythonBin: PYTHON, script: READ_SCRIPT });
 		expect(tags).toMatchObject({ title: 'Home Recording', artist: 'Alexis', album: 'Demos' });
+	});
+
+	it('writes a resolved credit as separate artists and reads it back whole', async () => {
+		const result = await ingestUpload(
+			'collab.opus',
+			readFileSync(FIXTURE),
+			{ title: 'Track', artist: 'Jay-Z, Kanye West', album: 'Throne', albumArtist: 'Jay-Z' },
+			{
+				root,
+				pythonBin: PYTHON,
+				tagScript: TAG_SCRIPT,
+				// Stands in for the MusicBrainz lookup having confirmed the split.
+				resolveCredits: () => ({
+					artists: ['Jay-Z', 'Kanye West'],
+					albumArtists: ['Jay-Z']
+				})
+			}
+		);
+
+		// Two real Vorbis comment values, not one combined string.
+		const raw = execFileSync(PYTHON, [
+			'-c',
+			`from mutagen.oggopus import OggOpus; print('+'.join(OggOpus(${JSON.stringify(
+				path.join(root, result.newPath)
+			)})['artist']))`
+		])
+			.toString()
+			.trim();
+		expect(raw).toBe('Jay-Z+Kanye West');
+
+		// The editor still shows one editable field, rejoined.
+		const tags = await readTags(result.newPath, { root, pythonBin: PYTHON, script: READ_SCRIPT });
+		expect(tags.artist).toBe('Jay-Z, Kanye West');
+
+		const nfo = readFileSync(path.join(root, 'Jay-Z/Throne/album.nfo'), 'utf8');
+		expect(nfo).toContain('<albumartist>Jay-Z</albumartist>');
 	});
 
 	it('rejects unsupported upload extensions', async () => {
@@ -84,7 +120,7 @@ describe('upload → edit round trip', () => {
 			'song.opus',
 			data,
 			{ title: 'Track', artist: 'Wrong Artist', album: 'Wrong Album', trackNumber: 1 },
-			{ root, pythonBin: PYTHON, tagScript: TAG_SCRIPT }
+			{ root, pythonBin: PYTHON, tagScript: TAG_SCRIPT, resolveCredits: typedCredits }
 		);
 		const result = await applyTags(
 			first.newPath,
@@ -95,7 +131,7 @@ describe('upload → edit round trip', () => {
 				year: '2020',
 				trackNumber: 1
 			},
-			{ root, pythonBin: PYTHON, tagScript: TAG_SCRIPT }
+			{ root, pythonBin: PYTHON, tagScript: TAG_SCRIPT, resolveCredits: typedCredits }
 		);
 		expect(result.newPath).toBe('Right Artist/Right Album (2020)/01 - Track.opus');
 		expect(existsSync(path.join(root, result.newPath))).toBe(true);
@@ -112,7 +148,7 @@ describe('upload → edit round trip', () => {
 			'song.opus',
 			readFileSync(FIXTURE),
 			{ title: 'T', artist: 'A', album: 'B' },
-			{ root, pythonBin: PYTHON, tagScript: TAG_SCRIPT }
+			{ root, pythonBin: PYTHON, tagScript: TAG_SCRIPT, resolveCredits: typedCredits }
 		);
 		mkdirSync(path.join(root, '.myoutarr-staging/x'), { recursive: true });
 		const top = listLibrary('', root);

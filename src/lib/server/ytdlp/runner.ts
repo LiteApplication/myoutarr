@@ -22,6 +22,20 @@ const AUDIO_EXTENSIONS = ['opus', 'm4a', 'mp3', 'flac', 'ogg', 'webm'];
 /** Fraction of the progress bar given to the download phase; the rest is tag+publish. */
 const DOWNLOAD_SHARE = 0.85;
 
+/**
+ * Individual artists to tag with. `meta.artists`/`meta.albumArtists` are set
+ * whenever the split is known to be real (YT Music listed them separately, or
+ * MusicBrainz confirmed it); otherwise the combined credit stays one value.
+ */
+function trackArtists(meta: JobMeta): string[] {
+	return meta.artists ?? [meta.artist];
+}
+
+function albumArtists(meta: JobMeta): string[] {
+	if (meta.albumArtists) return meta.albumArtists;
+	return meta.albumArtist ? [meta.albumArtist] : trackArtists(meta);
+}
+
 export interface PipelineOptions {
 	db?: DB;
 	ytdlpBin?: string;
@@ -184,9 +198,10 @@ export class YtdlpPipeline implements JobRunner {
 			metaFile,
 			JSON.stringify({
 				title: meta.title,
-				artist: meta.artist,
+				// Multi-valued so each credited artist becomes its own Jellyfin artist.
+				artist: trackArtists(meta),
 				album: meta.album,
-				albumartist: meta.albumArtist ?? meta.artist,
+				albumartist: albumArtists(meta),
 				date: meta.year,
 				genre: meta.genre,
 				tracknumber: meta.trackNumber,
@@ -260,6 +275,7 @@ export class YtdlpPipeline implements JobRunner {
 			albumNfo({
 				title: meta.album,
 				albumArtist: meta.albumArtist ?? meta.artist,
+				albumArtists: albumArtists(meta),
 				year: meta.year,
 				genres: meta.genre ? [meta.genre] : [],
 				mbAlbumId: meta.mbAlbumId,
