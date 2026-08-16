@@ -212,5 +212,33 @@ export const migrations: string[] = [
 	ALTER TABLE playlist_subscriptions_new RENAME TO playlist_subscriptions;
 	ALTER TABLE playlist_seen_new RENAME TO playlist_seen;
 	CREATE INDEX idx_playlist_subs_user ON playlist_subscriptions (created_by);
+	`,
+	// 7 - per-user settings + the "everything I added" Jellyfin playlist.
+	`
+	CREATE TABLE user_settings (
+		user_id TEXT NOT NULL,               -- Jellyfin user id
+		key     TEXT NOT NULL,
+		value   TEXT NOT NULL,               -- JSON-encoded
+		PRIMARY KEY (user_id, key)
+	) STRICT;
+
+	-- The Jellyfin playlist mirroring one user's downloads, remembered by id so a
+	-- rename does not orphan it (and so a deleted playlist can be rebuilt).
+	CREATE TABLE downloads_playlist (
+		user_id        TEXT PRIMARY KEY,
+		playlist_id    TEXT,
+		last_synced_at INTEGER
+	) STRICT;
+
+	-- Tracks already resolved to a Jellyfin item id and placed in that playlist.
+	-- Keyed on the library path, so a steady-state sync costs zero Jellyfin
+	-- searches and only genuinely new downloads are looked up.
+	CREATE TABLE downloads_playlist_items (
+		user_id  TEXT NOT NULL,
+		path     TEXT NOT NULL,              -- myoutarr's /music view of the file
+		item_id  TEXT NOT NULL,              -- Jellyfin item id
+		added_at INTEGER NOT NULL,
+		PRIMARY KEY (user_id, path)
+	) STRICT;
 	`
 ];

@@ -1,3 +1,4 @@
+import { reconcileDownloadsPlaylists } from '../jellyfin/downloads.ts';
 import { checkDuePlaylistSubscriptions } from '../playlists/check.ts';
 import { getSettings } from '../settings.ts';
 import { checkDueSubscriptions } from './check.ts';
@@ -39,6 +40,9 @@ export function startSubscriptionScheduler(onEnqueued: (batchIds: string[]) => v
 				batchIds.push(...(await checkDueSubscriptions(intervalMs)).batchIds);
 			}
 			batchIds.push(...(await checkDuePlaylistSubscriptions(intervalMs)).batchIds);
+			// Same cadence reconciles per-user downloads playlists, so tracks deleted
+			// in Jellyfin are noticed even when nothing new is queued.
+			await reconcileDownloadsPlaylists();
 			if (batchIds.length > 0) onEnqueued(batchIds);
 		} catch (cause) {
 			console.error('subscription scheduler tick failed:', (cause as Error).message);

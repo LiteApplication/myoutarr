@@ -13,7 +13,7 @@ const SCAN_POLL_ATTEMPTS = 18; // up to 3 minutes for the scan to surface items
 let refreshTimer: NodeJS.Timeout | null = null;
 
 /** Most recent valid session token for the user who queued the batch. */
-function tokenFor(userId: string, db: DB): { token: string } | null {
+export function tokenFor(userId: string, db: DB): { token: string } | null {
 	const row = db
 		.prepare(
 			`SELECT jellyfin_token FROM sessions

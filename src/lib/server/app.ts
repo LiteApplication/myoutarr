@@ -1,5 +1,6 @@
 import { building } from '$app/environment';
 import { getDb } from './db/index.ts';
+import { scheduleDownloadsPlaylistSync } from './jellyfin/downloads.ts';
 import {
 	scheduleIncrementalPlaylistSync,
 	scheduleRefresh,
@@ -46,6 +47,10 @@ export function getPool(): WorkerPool {
 			void syncPlaylistBatch(batchId).catch((cause) =>
 				console.error('playlist sync failed:', (cause as Error).message)
 			);
+			// Grow the owner's "everything I added" playlist, if they enabled one.
+			const batch = getDb().prepare('SELECT created_by FROM batches WHERE id = ?').get(batchId) as
+				{ created_by: string } | undefined;
+			if (batch) scheduleDownloadsPlaylistSync(batch.created_by);
 		});
 		const pipeline = new YtdlpPipeline({
 			enrich: async (meta) => (getSettings().musicBrainz ? enrichMeta(meta) : meta)

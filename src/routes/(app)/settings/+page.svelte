@@ -5,6 +5,10 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	let submitting = $state(false);
 	let settings = $derived(form?.settings ?? data.settings);
+	let userSettings = $derived(
+		form?.userSettings ??
+			data.userSettings ?? { downloadsPlaylist: false, downloadsPlaylistName: '' }
+	);
 </script>
 
 <svelte:head>
@@ -200,6 +204,39 @@
 					Shared cadence: how often followed artists, synced playlists, and recommendation playlists
 					are checked. Manage the list on the
 					<a href="/subscriptions" class="text-ink hover:underline">Subscriptions</a> page.
+				</span>
+			</label>
+		</section>
+
+		<section class="rounded-2xl bg-surface p-6">
+			<h2 class="mb-1 text-lg font-semibold">Your downloads playlist</h2>
+			<p class="mb-4 text-sm text-ink-muted">
+				Only affects your account - each user gets their own playlist.
+			</p>
+			<label class="flex items-center gap-3">
+				<input
+					type="checkbox"
+					name="downloadsPlaylist"
+					checked={userSettings.downloadsPlaylist}
+					class="accent-accent"
+				/>
+				<span class="text-sm text-ink">
+					Keep a Jellyfin playlist with every track you add, oldest first
+				</span>
+			</label>
+			<label class="mt-4 block max-w-sm">
+				<span class="mb-1 block text-sm text-ink-muted">Playlist name</span>
+				<input
+					name="downloadsPlaylistName"
+					type="text"
+					placeholder="(your name)'s downloads"
+					value={userSettings.downloadsPlaylistName}
+					class="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-ink placeholder:text-ink-faint focus:border-accent"
+				/>
+				<span class="mt-1 block text-xs text-ink-faint">
+					Turning this on backfills everything you added before now. Tracks you later delete from
+					Jellyfin drop out of the playlist and go back to <em>cancelled</em> in your
+					<a href="/logs" class="text-ink hover:underline">history</a>, ready to re-download.
 				</span>
 			</label>
 		</section>

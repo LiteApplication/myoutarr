@@ -1,13 +1,21 @@
+import { syncDownloadsPlaylist } from '$lib/server/jellyfin/downloads';
 import { getSettings, updateSettings, type Settings } from '$lib/server/settings';
-import { fail } from '@sveltejs/kit';
+import { getUserSettings, updateUserSettings, type UserSettings } from '$lib/server/userSettings';
+import { error, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = () => {
-	return { settings: getSettings() };
+export const load: PageServerLoad = ({ locals }) => {
+	const userId = locals.session?.userId;
+	return {
+		settings: getSettings(),
+		userSettings: userId ? getUserSettings(userId) : undefined
+	};
 };
 
 export const actions: Actions = {
-	default: async ({ request }) => {
+	default: async ({ request, locals }) => {
+		const userId = locals.session?.userId;
+		if (!userId) throw error(401, 'Not signed in');
 		const form = await request.formData();
 		const patch: Partial<Settings> = {};
 
@@ -49,6 +57,21 @@ export const actions: Actions = {
 			});
 		}
 
-		return { settings: updateSettings(patch), saved: true };
+		const userPatch: Partial<UserSettings> = {
+			downloadsPlaylist: form.get('downloadsPlaylist') === 'on',
+			downloadsPlaylistName: String(form.get('downloadsPlaylistName') ?? '').trim()
+		};
+		const wasEnabled = getUserSettings(userId).downloadsPlaylist;
+		const userSettings = updateUserSettings(userId, userPatch);
+
+		// Switching it on backfills everything added before now; a rename is picked
+		// up by the same pass. Both run detached so saving settings stays snappy.
+		if (userSettings.downloadsPlaylist && !wasEnabled) {
+			void syncDownloadsPlaylist(userId, undefined, { poll: false }).catch((cause) =>
+				console.error('downloads playlist backfill failed:', (cause as Error).message)
+			);
+		}
+
+		return { settings: updateSettings(patch), userSettings, saved: true };
 	}
 };
