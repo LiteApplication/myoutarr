@@ -43,7 +43,7 @@
 	"dependencies": {
 		"@fontsource-variable/fraunces": "^5.2.9",
 		"@fontsource-variable/inter": "^5.2.8",
-		"better-sqlite3": "^12.11.1"
+		"better-sqlite3": "^13.0.3"
 	},
 	"allowScripts": {
 		"better-sqlite3@12.11.1": true
