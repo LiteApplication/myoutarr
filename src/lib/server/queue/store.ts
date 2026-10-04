@@ -287,6 +287,21 @@ export function retryJob(id: string, userId: string, db: DB = getDb()): boolean 
 	);
 }
 
+/**
+ * Requeue every `failed` job of the calling user. `cancelled` jobs are left
+ * alone on purpose: that is where a track deleted from the library (by the user,
+ * via Jellyfin) lands, and it must not be downloaded again.
+ */
+export function retryFailedJobs(userId: string, db: DB = getDb()): number {
+	return db
+		.prepare(
+			`UPDATE jobs SET status = 'queued', error = NULL, next_retry_at = NULL, attempts = 0, progress = 0
+			 WHERE status = 'failed'
+			 AND batch_id IN (SELECT id FROM batches WHERE created_by = ?)`
+		)
+		.run(userId).changes;
+}
+
 /** Pause only the calling user's queued jobs. */
 export function pauseQueue(userId: string, db: DB = getDb()): void {
 	db.prepare(

@@ -13,6 +13,10 @@
 		cancelled: 'text-ink-faint'
 	};
 
+	const failedCount = $derived(
+		queue.batches.reduce((n, b) => n + b.jobs.filter((j) => j.status === 'failed').length, 0)
+	);
+
 	let expandedError = $state<string | null>(null);
 
 	function batchLinkHref(b: { kind: string; sourceId: string }): string {
@@ -38,6 +42,14 @@
 <div class="mb-6 flex items-center justify-between">
 	<h1 class="text-3xl font-bold">Queue</h1>
 	<div class="flex gap-2">
+		{#if failedCount > 0}
+			<button
+				onclick={() => queue.action('retry-failed')}
+				class="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-accent-ink transition hover:bg-accent-hover"
+			>
+				Retry all failed ({failedCount})
+			</button>
+		{/if}
 		<button
 			onclick={() => queue.action('pause')}
 			class="rounded-full bg-surface-2 px-4 py-1.5 text-sm text-ink-muted transition hover:bg-surface-3 hover:text-ink"

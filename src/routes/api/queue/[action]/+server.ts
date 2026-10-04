@@ -1,6 +1,13 @@
 import { getPool } from '$lib/server/app';
 import { publish } from '$lib/server/events';
-import { cancelBatch, cancelJob, pauseQueue, resumeQueue, retryJob } from '$lib/server/queue/store';
+import {
+	cancelBatch,
+	cancelJob,
+	pauseQueue,
+	resumeQueue,
+	retryFailedJobs,
+	retryJob
+} from '$lib/server/queue/store';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
@@ -8,6 +15,7 @@ import type { RequestHandler } from './$types';
  * POST /api/queue/pause | resume - whole queue
  * POST /api/queue/cancel  { batchId } or { jobId }
  * POST /api/queue/retry   { jobId }
+ * POST /api/queue/retry-failed - requeue every failed job (never cancelled ones)
  */
 export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const body = (await request.json().catch(() => ({}))) as { batchId?: string; jobId?: string };
@@ -43,6 +51,14 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			const ok = retryJob(body.jobId, userId);
 			if (ok) getPool().poke();
 			return json({ ok });
+		}
+		case 'retry-failed': {
+			const retried = retryFailedJobs(userId);
+			if (retried > 0) {
+				publish({ type: 'queue', payload: { retried } });
+				getPool().poke();
+			}
+			return json({ ok: true, retried });
 		}
 		default:
 			return json({ error: 'unknown action' }, { status: 404 });

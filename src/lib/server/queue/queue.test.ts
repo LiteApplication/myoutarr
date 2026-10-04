@@ -17,6 +17,7 @@ import {
 	pauseQueue,
 	recoverOrphans,
 	resumeQueue,
+	retryFailedJobs,
 	retryJob,
 	type Job,
 	type NewTrack
@@ -177,6 +178,20 @@ describe('queue store', () => {
 		const jobId = listQueue('u1', db)[0].jobs[0].id;
 		expect(retryJob(jobId, 'u1', db)).toBe(true);
 		expect(batchDrained(batch.id, db)).toBe(false);
+	});
+
+	it('retryFailedJobs requeues failed jobs but not cancelled ones', () => {
+		const { batch } = makeBatch(3);
+		const a = claimNextJob(db)!;
+		failJob(a.id, 'boom', { maxRetries: 0, retryable: false }, db);
+		const b = claimNextJob(db)!;
+		cancelJob(b.id, 'u1', db);
+		expect(retryFailedJobs('u2', db)).toBe(0);
+		expect(retryFailedJobs('u1', db)).toBe(1);
+		const jobs = listQueue('u1', db)[0].jobs;
+		expect(jobs.find((j) => j.id === a.id)!.status).toBe('queued');
+		expect(jobs.find((j) => j.id === b.id)!.status).toBe('cancelled');
+		expect(batch.id).toBeTruthy();
 	});
 
 	it('pause/resume flips queued jobs only', () => {

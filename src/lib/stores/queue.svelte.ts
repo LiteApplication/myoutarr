@@ -127,7 +127,7 @@ class QueueStore {
 	}
 
 	async action(
-		action: 'pause' | 'resume' | 'cancel' | 'retry',
+		action: 'pause' | 'resume' | 'cancel' | 'retry' | 'retry-failed',
 		target: { batchId?: string; jobId?: string } = {}
 	): Promise<void> {
 		await fetch(`/api/queue/${action}`, {
