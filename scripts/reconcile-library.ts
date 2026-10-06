@@ -7,9 +7,15 @@
  * Duplicates (same track, several files) collapse onto the highest-quality
  * copy; the rest are renamed to the configured naming template. Nothing is
  * touched without --apply.
+ *
+ * The running app holds an exclusive lock on its SQLite file, so a dry run never
+ * opens it (the naming template comes from --template, default Lidarr's). --apply
+ * needs the database to repoint finished jobs at renamed files, so stop the app
+ * first, or pass --no-db to skip that bookkeeping.
  */
 import { getDb } from '../src/lib/server/db/index.ts';
 import { musicDir } from '../src/lib/server/env.ts';
+import { LIDARR_TEMPLATE } from '../src/lib/server/library/naming.ts';
 import { assertMounted } from '../src/lib/server/library/publish.ts';
 import { applyPlan, planReconcile } from '../src/lib/server/library/reconcile.ts';
 import { getSettings } from '../src/lib/server/settings.ts';
@@ -18,8 +24,12 @@ const apply = process.argv.includes('--apply');
 const root = musicDir();
 assertMounted(root);
 
-const db = getDb();
-const plan = await planReconcile(root, getSettings(db).namingTemplate);
+const flag = (name: string) => process.argv.indexOf(name);
+const templateArg = process.argv[flag('--template') + 1];
+const db = apply && !process.argv.includes('--no-db') ? getDb() : undefined;
+const template =
+	flag('--template') >= 0 ? templateArg : db ? getSettings(db).namingTemplate : LIDARR_TEMPLATE;
+const plan = await planReconcile(root, template);
 const rel = (p: string) => p.slice(root.length + 1);
 
 console.log(`scanned ${plan.scanned} files under ${root}\n`);
