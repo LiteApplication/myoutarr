@@ -49,6 +49,9 @@ COPY --from=build /app/build ./build
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY python ./python
+# Source for scripts/ (e.g. reconcile-library.ts, run with `node` type stripping).
+COPY scripts ./scripts
+COPY src/lib/server ./src/lib/server
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 ENV NODE_ENV=production \
@@ -60,6 +63,7 @@ ENV NODE_ENV=production \
 	YTM_WORKER=/app/python/ytm_worker.py \
 	TAG_SCRIPT=/app/python/tag.py \
 	READ_TAGS_SCRIPT=/app/python/read_tags.py \
+	PROBE_SCRIPT=/app/python/probe_tracks.py \
 	YTDLP_BIN=/opt/venv/bin/yt-dlp \
 	# Use the image's Node for yt-dlp's JS challenge solver (yt-dlp defaults to
 	# Deno, which the Alpine image doesn't ship). Node 26 here satisfies EJS's

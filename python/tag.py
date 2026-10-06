@@ -68,6 +68,8 @@ def tag_vorbis_like(audio, meta):
             audio["tracktotal"] = str(meta["totaltracks"])
     if meta.get("discnumber"):
         audio["discnumber"] = str(meta["discnumber"])
+        if meta.get("totaldiscs"):
+            audio["totaldiscs"] = str(meta["totaldiscs"])
 
 
 def embed_cover_vorbis(audio, data, mime):

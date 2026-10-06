@@ -240,5 +240,13 @@ export const migrations: string[] = [
 		added_at INTEGER NOT NULL,
 		PRIMARY KEY (user_id, path)
 	) STRICT;
+	`,
+	// 8 - the default naming template became Lidarr's. A stored value equal to the
+	// old default was never a customisation, so drop it and let the new default
+	// apply; anything else the user typed is kept.
+	`
+	DELETE FROM settings
+	WHERE key = 'namingTemplate'
+	  AND value = '"{albumartist}/{album} ({year})/{track:02} - {title}"';
 	`
 ];

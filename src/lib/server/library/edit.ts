@@ -137,7 +137,8 @@ export async function applyTags(
 		.filter((name) => /\.(opus|m4a|mp3|flac|ogg)$/i.test(name))
 		.sort()
 		.map((name, index) => {
-			const match = name.match(/^(\d+)\s*-\s*(.+)\.\w+$/);
+			// "01 - Title" (old layout) or "Artist - Album - 01 - Title" (Lidarr)
+			const match = name.match(/^(?:.*? - )??(\d{1,3})\s*-\s*(.+)\.\w+$/);
 			return {
 				position: match ? Number(match[1]) : index + 1,
 				title: match ? match[2] : name.replace(/\.\w+$/, '')

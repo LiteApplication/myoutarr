@@ -1,5 +1,6 @@
 import type { DB } from './db/index.ts';
 import { getDb } from './db/index.ts';
+import { LIDARR_TEMPLATE } from './library/naming.ts';
 
 export interface Settings {
 	/** Audio container/codec passed to yt-dlp --audio-format. */
@@ -45,7 +46,7 @@ export const defaults: Settings = {
 	audioQuality: 0,
 	concurrency: 2,
 	maxRetries: 3,
-	namingTemplate: '{albumartist}/{album} ({year})/{track:02} - {title}',
+	namingTemplate: LIDARR_TEMPLATE,
 	sponsorBlock: true,
 	musicBrainz: true,
 	jellyfinRefresh: true,

@@ -64,6 +64,9 @@ export function deleteLibraryEntry(
 	return { kind: 'track', removed: relative };
 }
 
+/** "01 - Title" (old layout) or "Artist - Album - 01 - Title" (Lidarr). */
+const TRACK_FILE = /^(?:.*? - )??(\d{1,3})\s*-\s*(.+)\.\w+$/;
+
 /** Reverse the XML escaping applied by nfo.ts. */
 function unesc(value: string): string {
 	return value
@@ -96,7 +99,7 @@ function refreshAlbumNfoTracklist(albumDir: string): void {
 		.filter((name) => AUDIO_RE.test(name))
 		.sort()
 		.map((name, index) => {
-			const match = name.match(/^(\d+)\s*-\s*(.+)\.\w+$/);
+			const match = name.match(TRACK_FILE);
 			return {
 				position: match ? Number(match[1]) : index + 1,
 				title: match ? match[2] : name.replace(/\.\w+$/, '')

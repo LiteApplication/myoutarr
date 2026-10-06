@@ -24,6 +24,8 @@ export interface JobMeta {
 	genre?: string;
 	trackNumber?: number;
 	discNumber?: number;
+	/** Disc count of the release; > 1 puts tracks under a per-disc folder. */
+	totalDiscs?: number;
 	totalTracks?: number;
 	thumbnail?: string;
 	albumBrowseId?: string;

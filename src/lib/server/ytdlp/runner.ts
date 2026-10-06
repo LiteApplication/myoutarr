@@ -5,9 +5,17 @@ import { createInterface } from 'node:readline';
 import type { DB } from '../db/index.ts';
 import { getDb } from '../db/index.ts';
 import { configDir, musicDir, potProviderBaseUrl, scratchDir, ytdlpJsRuntimes } from '../env.ts';
-import { renderTemplate, resolveLibraryPath } from '../library/naming.ts';
+import { bestTrack, findExistingTracks, type LibraryTrack } from '../library/existing.ts';
+import {
+	discFolder,
+	renderTemplate,
+	resolveLibraryPath,
+	sanitizeSegment
+} from '../library/naming.ts';
 import { albumNfo, artistNfo } from '../library/nfo.ts';
 import { publishFile, writeSidecar } from '../library/publish.ts';
+import { candidateQuality, isUpgrade } from '../library/quality.ts';
+import { relocateOutput } from '../library/relocate.ts';
 import { getJobOwner } from '../queue/store.ts';
 import type { Job, JobMeta } from '../queue/store.ts';
 import type { JobRunner, RunResult } from '../queue/worker.ts';
@@ -76,22 +84,42 @@ export class YtdlpPipeline implements JobRunner {
 		const scratch = path.join(this.options.scratchRoot ?? scratchDir(), job.id);
 		mkdirSync(scratch, { recursive: true });
 		try {
+			const meta = await this.enrich(job.meta).catch(() => job.meta);
+			const settings = getSettings(this.db);
+			const libraryRoot = this.options.libraryRoot ?? musicDir();
+
+			// Lidarr's upgrade rule: a copy already in the library that is at least as
+			// good satisfies the request, so don't download it again.
+			const candidate = candidateQuality(settings);
+			const existing = await findExistingTracks(libraryRoot, meta, {
+				pythonBin: this.pythonBin
+			}).catch(() => [] as LibraryTrack[]);
+			const best = bestTrack(existing);
+			if (best && !isUpgrade(candidate, best.quality)) {
+				onProgress(1);
+				return { outputPath: best.path };
+			}
+
 			await this.download(job, scratch, onProgress, signal);
 			const audioFile = this.findAudioFile(scratch);
 
-			const meta = await this.enrich(job.meta).catch(() => job.meta);
 			const coverPath = await this.fetchCover(meta, scratch, signal);
 			await this.tag(audioFile, meta, coverPath, signal);
 			onProgress(0.92);
 
-			const settings = getSettings(this.db);
-			const libraryRoot = this.options.libraryRoot ?? musicDir();
 			const ext = path.extname(audioFile).slice(1);
 			const relative = renderTemplate(settings.namingTemplate, meta);
 			const targetPath = resolveLibraryPath(libraryRoot, relative, ext);
 
 			this.publishWithRetryClassification(audioFile, targetPath, job.id, libraryRoot);
 			onProgress(0.97);
+
+			// Upgrade: the better copy is in place, so retire the ones it replaces.
+			for (const old of existing) {
+				if (old.path === targetPath || !isUpgrade(candidate, old.quality)) continue;
+				rmSync(old.path, { force: true });
+				relocateOutput(this.db, old.path, targetPath);
+			}
 
 			this.writeSidecars(job, meta, targetPath, coverPath, libraryRoot);
 			onProgress(1);
@@ -207,6 +235,7 @@ export class YtdlpPipeline implements JobRunner {
 				tracknumber: meta.trackNumber,
 				totaltracks: meta.totalTracks,
 				discnumber: meta.discNumber,
+				totaldiscs: meta.totalDiscs,
 				mb_artist_id: meta.mbArtistId,
 				mb_album_id: meta.mbAlbumId,
 				mb_releasegroup_id: meta.mbReleaseGroupId,
@@ -259,7 +288,12 @@ export class YtdlpPipeline implements JobRunner {
 		coverPath: string | undefined,
 		libraryRoot: string
 	): void {
-		const albumDir = path.dirname(targetPath);
+		let albumDir = path.dirname(targetPath);
+		// Multi-disc releases nest tracks one level down ("Digital Media 01/").
+		const disc = discFolder(meta);
+		if (disc !== '' && path.basename(albumDir) === sanitizeSegment(disc)) {
+			albumDir = path.dirname(albumDir);
+		}
 		const artistDir = path.dirname(albumDir);
 
 		const siblings = this.db

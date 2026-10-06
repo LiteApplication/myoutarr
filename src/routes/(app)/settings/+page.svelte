@@ -140,7 +140,8 @@
 					class="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 font-mono text-sm text-ink focus:border-accent"
 				/>
 				<span class="mt-1 block text-xs text-ink-faint">
-					Placeholders: {'{albumartist} {artist} {album} {year} {title} {track:02} {disc}'}
+					Placeholders: {'{albumartist} {artist} {album} {year} {title} {track:02} {medium:02} {discdir}'}.
+					Lidarr tokens like {'{Artist Name}'} also work.
 				</span>
 			</label>
 			<label class="mt-4 flex items-center gap-3">

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { JobMeta } from '../queue/store.ts';
-import { renderTemplate, resolveLibraryPath, sanitizeSegment } from './naming.ts';
+import { LIDARR_TEMPLATE, renderTemplate, resolveLibraryPath, sanitizeSegment } from './naming.ts';
 import { albumNfo, artistNfo } from './nfo.ts';
 import { assertMounted, createSentinel, MountMissingError, publishFile } from './publish.ts';
 
@@ -48,10 +48,32 @@ describe('renderTemplate', () => {
 		trackNumber: 1
 	};
 
-	it('renders the default template', () => {
+	it('renders the legacy template', () => {
 		expect(renderTemplate('{albumartist}/{album} ({year})/{track:02} - {title}', meta)).toBe(
 			'Daft Punk/Discovery (2001)/01 - One More Time'
 		);
+	});
+
+	it('renders the Lidarr template by default', () => {
+		expect(renderTemplate(LIDARR_TEMPLATE, meta)).toBe(
+			'Daft Punk/Discovery (2001)/Daft Punk - Discovery - 01 - One More Time'
+		);
+	});
+
+	it('nests multi-disc releases in a per-disc folder, like Lidarr', () => {
+		const disc2 = { ...meta, discNumber: 2, totalDiscs: 2, trackNumber: 3 };
+		expect(renderTemplate(LIDARR_TEMPLATE, disc2)).toBe(
+			'Daft Punk/Discovery (2001)/Digital Media 02/Daft Punk - Discovery - 03 - One More Time'
+		);
+	});
+
+	it('accepts Lidarr token names and {track:00}', () => {
+		expect(
+			renderTemplate(
+				'{Artist Name}/{Album Title} ({Release Year})/{Artist Name} - {Album Title} - {track:00} - {Track Title}',
+				meta
+			)
+		).toBe('Daft Punk/Discovery (2001)/Daft Punk - Discovery - 01 - One More Time');
 	});
 
 	it('drops empty parens when year is missing', () => {

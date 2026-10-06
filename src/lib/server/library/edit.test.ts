@@ -64,7 +64,7 @@ describe('upload → edit round trip', () => {
 			{ title: 'Home Recording', artist: 'Alexis', album: 'Demos', year: '2026', trackNumber: 1 },
 			{ root, pythonBin: PYTHON, tagScript: TAG_SCRIPT, resolveCredits: typedCredits }
 		);
-		expect(result.newPath).toBe('Alexis/Demos (2026)/01 - Home Recording.opus');
+		expect(result.newPath).toBe('Alexis/Demos (2026)/Alexis - Demos - 01 - Home Recording.opus');
 		expect(existsSync(path.join(root, result.newPath))).toBe(true);
 		expect(existsSync(path.join(root, 'Alexis/Demos (2026)/album.nfo'))).toBe(true);
 
@@ -133,7 +133,9 @@ describe('upload → edit round trip', () => {
 			},
 			{ root, pythonBin: PYTHON, tagScript: TAG_SCRIPT, resolveCredits: typedCredits }
 		);
-		expect(result.newPath).toBe('Right Artist/Right Album (2020)/01 - Track.opus');
+		expect(result.newPath).toBe(
+			'Right Artist/Right Album (2020)/Right Artist - Right Album - 01 - Track.opus'
+		);
 		expect(existsSync(path.join(root, result.newPath))).toBe(true);
 		// Old tree is gone entirely.
 		expect(existsSync(path.join(root, 'Wrong Artist'))).toBe(false);

@@ -129,9 +129,13 @@ describe('full pipeline', () => {
 		expect(jobs.map((j) => j.status)).toEqual(['completed', 'completed']);
 
 		const albumDir = path.join(library, 'Daft Punk', 'Discovery (2001)');
-		expect(existsSync(path.join(albumDir, '01 - One More Time.opus'))).toBe(true);
+		expect(existsSync(path.join(albumDir, 'Daft Punk - Discovery - 01 - One More Time.opus'))).toBe(
+			true
+		);
 		// XML-hostile title survived sanitisation into a safe filename…
-		expect(existsSync(path.join(albumDir, '02 - Aerodynamic _live_ & loud.opus'))).toBe(true);
+		expect(
+			existsSync(path.join(albumDir, 'Daft Punk - Discovery - 02 - Aerodynamic _live_ & loud.opus'))
+		).toBe(true);
 
 		// …and was escaped inside the NFO.
 		const nfo = readFileSync(path.join(albumDir, 'album.nfo'), 'utf8');
@@ -143,7 +147,7 @@ describe('full pipeline', () => {
 		const probe = execFileSync(PYTHON, [
 			'-c',
 			`from mutagen.oggopus import OggOpus; a = OggOpus(${JSON.stringify(
-				path.join(albumDir, '01 - One More Time.opus')
+				path.join(albumDir, 'Daft Punk - Discovery - 01 - One More Time.opus')
 			)}); print(a['title'][0], '|', a['album'][0], '|', a['date'][0], '|', a['tracknumber'][0], '|', '+'.join(a['artist']), '|', '+'.join(a['albumartist']))`
 		]).toString();
 		// Each credited artist is its own tag value, so Jellyfin lists them
@@ -191,5 +195,82 @@ describe('full pipeline', () => {
 		const sorted = [...fractions].sort((a, b) => a - b);
 		expect(fractions).toEqual(sorted);
 		expect(fractions.at(-1)).toBe(1);
+	});
+
+	describe('library-aware downloads (Lidarr upgrade rules)', () => {
+		const albumDir = () => path.join(library, 'Daft Punk', 'Discovery (2001)');
+
+		/** A real audio file in the library, tagged the way Lidarr/Picard would. */
+		function seedLibraryFile(name: string, codecArgs: string[]): string {
+			mkdirSync(albumDir(), { recursive: true });
+			const target = path.join(albumDir(), name);
+			execFileSync('ffmpeg', [
+				'-y',
+				'-loglevel',
+				'error',
+				'-f',
+				'lavfi',
+				'-i',
+				'sine=frequency=440:duration=2',
+				...codecArgs,
+				'-metadata',
+				'title=One More Time',
+				'-metadata',
+				'artist=Daft Punk',
+				'-metadata',
+				'album=Discovery',
+				'-metadata',
+				'album_artist=Daft Punk',
+				'-metadata',
+				'track=1',
+				target
+			]);
+			return target;
+		}
+
+		function runFirst() {
+			seedAlbum();
+			const job = claimNextJob(db)!;
+			return pipeline().run(job, () => {}, new AbortController().signal);
+		}
+
+		it('skips the download when a lossless copy already exists', async () => {
+			const flac = seedLibraryFile('Daft Punk - Discovery - 01 - One More Time.flac', [
+				'-c:a',
+				'flac'
+			]);
+			// Any attempt to download would fail, proving yt-dlp is never reached.
+			process.env.FAKE_YTDLP_MODE = 'fail-permanent';
+			const result = await runFirst();
+			expect(result.outputPath).toBe(flac);
+			expect(existsSync(path.join(albumDir(), '01 - One More Time.opus'))).toBe(false);
+		}, 30_000);
+
+		it('skips when the existing lossy copy is as good, even under another naming', async () => {
+			const opus = seedLibraryFile('01 - One More Time.opus', ['-c:a', 'libopus', '-b:a', '128k']);
+			process.env.FAKE_YTDLP_MODE = 'fail-permanent';
+			const result = await runFirst();
+			expect(result.outputPath).toBe(opus);
+		}, 30_000);
+
+		it('replaces a clearly worse copy and repoints finished jobs at the new file', async () => {
+			const old = seedLibraryFile('01 - One More Time.mp3', ['-c:a', 'libmp3lame', '-b:a', '48k']);
+			db.prepare(
+				"INSERT INTO batches (id, kind, source_id, title, created_at, created_by) VALUES ('b0','song','x','x',0,'u')"
+			).run();
+			db.prepare(
+				"INSERT INTO jobs (id, batch_id, video_id, position, status, meta, output_path) VALUES ('j0','b0','vvvvvvvvvvv',0,'completed','{}', ?)"
+			).run(old);
+
+			const result = await runFirst();
+			expect(result.outputPath).toBe(
+				path.join(albumDir(), 'Daft Punk - Discovery - 01 - One More Time.opus')
+			);
+			expect(existsSync(old)).toBe(false);
+			const row = db.prepare("SELECT output_path FROM jobs WHERE id = 'j0'").get() as {
+				output_path: string;
+			};
+			expect(row.output_path).toBe(result.outputPath);
+		}, 30_000);
 	});
 });

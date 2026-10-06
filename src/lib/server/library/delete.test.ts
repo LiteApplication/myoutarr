@@ -72,8 +72,8 @@ describe('deleteLibraryEntry', () => {
 
 		const albumDir = path.join(root, 'Band/Record');
 		expect(existsSync(albumDir)).toBe(true);
-		expect(existsSync(path.join(albumDir, '01 - First.opus'))).toBe(true);
-		expect(existsSync(path.join(albumDir, '02 - Second.opus'))).toBe(false);
+		expect(existsSync(path.join(albumDir, 'Band - Record - 01 - First.opus'))).toBe(true);
+		expect(existsSync(path.join(albumDir, 'Band - Record - 02 - Second.opus'))).toBe(false);
 
 		const nfo = readFileSync(path.join(albumDir, 'album.nfo'), 'utf8');
 		expect(nfo).toContain('<title>First</title>');
