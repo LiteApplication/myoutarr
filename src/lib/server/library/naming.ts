@@ -7,8 +7,12 @@ const WINDOWS_RESERVED = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
 export function sanitizeSegment(input: string): string {
 	let segment = input
 		.normalize('NFC')
+		// Lidarr's substitutions: "Title: Sub" -> "Title - Sub", "?" -> "!"
+		.replace(/:\s+/g, ' - ')
+		.replace(/:/g, '-')
+		.replace(/\?/g, '!')
 		// eslint-disable-next-line no-control-regex
-		.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+		.replace(/[<>"/\\|*\u0000-\u001f]/g, '_')
 		.replace(/^\.+/, '_') // no dot-prefixed segments: hidden files / '..' traversal
 		.replace(/[. ]+$/, '') // Windows rejects trailing dots and spaces
 		.trim();

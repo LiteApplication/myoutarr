@@ -9,7 +9,7 @@ import { assertMounted, createSentinel, MountMissingError, publishFile } from '.
 
 describe('sanitizeSegment', () => {
 	it('replaces reserved characters', () => {
-		expect(sanitizeSegment('AC/DC: Back <in> Black?')).toBe('AC_DC_ Back _in_ Black_');
+		expect(sanitizeSegment('AC/DC: Back <in> Black?')).toBe('AC_DC - Back _in_ Black!');
 	});
 
 	it('neutralises traversal and hidden-file prefixes', () => {
